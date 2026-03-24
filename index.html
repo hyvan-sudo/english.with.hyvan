@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>HYVAN — Tiếng Anh</title>
+<!-- v1774333781 -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <!-- Firebase -->
@@ -383,7 +387,8 @@ nav {
 .pill-thpt { background: var(--blue-light); color: var(--blue); }
 .pill-ielts { background: var(--amber-light); color: var(--amber); }
 
-main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+#page-quiz { max-width: 100% !important; padding: 0 !important; }
 
 .page { display: none; }
 .page.active { display: block; }
@@ -1500,7 +1505,7 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
                 <button onclick="clearHighlights()" style="padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:none;cursor:pointer;font-size:0.72rem;color:var(--muted);font-family:inherit">Xoá highlight</button>
               </div>
             </div>
-            <div id="quiz-passage-content" style="font-size:0.9rem;line-height:1.9;color:var(--ink2);white-space:pre-wrap;padding:1.25rem 1.5rem;flex:1;overflow-y:auto;user-select:text" onmouseup="handleHighlight(event)"></div>
+            <div id="quiz-passage-content" style="font-size:0.9rem;line-height:1.9;color:var(--ink2);white-space:pre-wrap;padding:1.25rem 1.5rem;flex:1;overflow-y:auto;user-select:text;cursor:text" onmouseup="handleHighlight(event)"></div>
           </div>
 
           <!-- RIGHT: questions -->
@@ -2174,8 +2179,11 @@ async function loadExams() {
 function createExamCard(id, exam) {
   const div = document.createElement('div');
   div.className = 'exam-card';
-  div.onclick = () => startExam(id, exam);
+  const isTeacher = TEACHER_EMAILS.includes(currentUser?.email);
   const qCount = exam.questions ? Object.keys(exam.questions).length : 0;
+
+  const delBtn = isTeacher ? `<button onclick="deleteExam('${id}',event)" style="padding:4px 10px;border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:inherit">🗑 Xoá</button>` : '';
+
   div.innerHTML = `
     <div class="exam-week">${exam.week || ''}</div>
     <div class="exam-title">${exam.title}</div>
@@ -2185,10 +2193,24 @@ function createExamCard(id, exam) {
     </div>
     <div class="exam-footer">
       <span class="pill ${exam.track === 'ielts' ? 'pill-ielts-tag' : 'pill-new'}">${exam.track === 'ielts' ? 'IELTS' : 'THPT'}</span>
-      <span style="font-size:0.8rem;color:var(--muted)">${formatDate(exam.createdAt)}</span>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <span style="font-size:0.8rem;color:var(--muted)">${formatDate(exam.createdAt)}</span>
+        ${delBtn}
+      </div>
     </div>
   `;
+  if (!isTeacher) div.onclick = () => startExam(id, exam);
+  else div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') startExam(id, exam); };
   return div;
+}
+
+async function deleteExam(id, e) {
+  e.stopPropagation();
+  if (!confirm('Xoá đề thi này? Không thể khôi phục!')) return;
+  await db.ref('exams/' + id).remove();
+  showToast('✅ Đã xoá đề thi!');
+  loadExams();
+  loadDashboard();
 }
 
 // ═══════════════════════════════
@@ -2252,9 +2274,14 @@ function renderQuestion() {
     });
     html += '</div>';
   } else if (type === 'tfng') {
-    html += '<div style="display:flex;gap:0.75rem;margin-top:0.5rem;flex-wrap:wrap">';
-    [['TRUE','✓ True','var(--green)','var(--green-light)'],['FALSE','✗ False','var(--red)','var(--red-light)'],['NOT GIVEN','? Not Given','var(--amber)','var(--amber-light)']].forEach((cfg,i) => {
-      html += '<button id="opt-'+i+'" onclick="selectAnswer('+i+')" style="flex:1;min-width:80px;padding:12px 8px;border:2px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;font-family:inherit;font-size:0.9rem;font-weight:600;color:var(--muted);transition:all 0.15s" onmouseover="if(!this.disabled)this.style.borderColor=\''+cfg[2]+'\';this.style.color=\''+cfg[2]+'\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\';this.style.color=\'var(--muted)\'">' + cfg[1] + '</button>';
+    html += '<div style="display:flex;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap">';
+    const tfngCfg = [
+      ['✓ True','#16a34a','#f0fdf4','#86efac'],
+      ['✗ False','#dc2626','#fef2f2','#fca5a5'],
+      ['? Not Given','#b45309','#fef3c7','#fcd34d']
+    ];
+    tfngCfg.forEach((cfg,i) => {
+      html += '<button id="opt-'+i+'" onclick="selectAnswer('+i+')" style="flex:1;min-width:90px;padding:14px 8px;border:2px solid var(--border);border-radius:10px;background:var(--white);cursor:pointer;font-family:inherit;font-size:0.95rem;font-weight:600;color:var(--muted);transition:all 0.2s">' + cfg[0] + '</button>';
     });
     html += '</div>';
   } else if (type === 'fill') {
@@ -2286,24 +2313,26 @@ function highlightAnswer(selected, correct, explanation) {
   const type = q ? q.type : 'mcq';
 
   if (type === 'tfng') {
-    const colors = ['var(--green)','var(--red)','var(--amber)'];
-    const bgColors = ['var(--green-light)','var(--red-light)','var(--amber-light)'];
+    const tfColors = ['#16a34a','#dc2626','#b45309'];
+    const tfBg = ['#f0fdf4','#fef2f2','#fef3c7'];
     [0,1,2].forEach(i => {
       const btn = document.getElementById('opt-'+i);
       if (!btn) return;
       btn.disabled = true;
       btn.dataset.sel = '1';
       if (i === correct) {
-        btn.style.borderColor = colors[i];
-        btn.style.background = bgColors[i];
-        btn.style.color = colors[i];
+        btn.style.borderColor = tfColors[i];
+        btn.style.background = tfBg[i];
+        btn.style.color = tfColors[i];
+        btn.style.transform = 'scale(1.03)';
       } else if (i === selected && selected !== correct) {
-        btn.style.borderColor = 'var(--red)';
-        btn.style.background = 'var(--red-light)';
-        btn.style.color = 'var(--red)';
-        btn.style.opacity = '0.6';
+        btn.style.borderColor = '#dc2626';
+        btn.style.background = '#fef2f2';
+        btn.style.color = '#dc2626';
+        btn.style.opacity = '0.7';
+        btn.style.textDecoration = 'line-through';
       } else {
-        btn.style.opacity = '0.4';
+        btn.style.opacity = '0.35';
       }
     });
   } else {
