@@ -3,11 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>HYVAN — Tiếng Anh</title>
-<!-- v1774333781 -->
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <!-- Firebase -->
@@ -387,9 +383,25 @@ nav {
 .pill-thpt { background: var(--blue-light); color: var(--blue); }
 .pill-ielts { background: var(--amber-light); color: var(--amber); }
 
-main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
-main.quiz-active { max-width: 100% !important; padding: 0.75rem !important; }
-#page-quiz { max-width: 100% !important; padding: 0 !important; }
+main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+
+/* Quiz page — fixed fullscreen below nav */
+#page-quiz {
+  position: fixed !important;
+  top: 58px; left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  background: var(--cream);
+  display: none !important;
+  flex-direction: column;
+  overflow: hidden;
+}
+#page-quiz.active {
+  display: flex !important;
+}
+
+/* Note panel — overlay */
+#note-panel { display: none !important; }
+#note-panel.open { display: flex !important; }
 
 .page { display: none; }
 .page.active { display: block; }
@@ -1270,6 +1282,110 @@ main.quiz-active { max-width: 100% !important; padding: 0.75rem !important; }
   cursor: pointer;
 }
 
+
+/* Highlight mode active */
+#quiz-passage-content.highlight-mode { cursor: crosshair; }
+#tool-highlight-btn.active-tool {
+  background: #fff176 !important;
+  border-color: #f9a825 !important;
+  color: var(--ink) !important;
+}
+
+/* Bottom nav dots */
+.q-nav-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.q-nav-dot:hover { border-color: var(--green-mid); color: var(--green); }
+.q-nav-dot.answered { background: var(--green); border-color: var(--green); color: white; }
+.q-nav-dot.current { background: var(--blue); border-color: var(--blue); color: white; }
+
+/* Passage tabs in quiz */
+.passage-tab-btn {
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.passage-tab-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+/* ── TEACHER MANUAL QUESTION BUILDER ── */
+.manual-q-card {
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.875rem 1rem;
+}
+
+.manual-q-card .q-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.q-type-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.q-type-mcq { background: var(--blue-light); color: var(--blue); }
+.q-type-tfng { background: var(--green-light); color: var(--green); }
+.q-type-fill { background: var(--amber-light); color: var(--amber); }
+
+.btn-remove-q {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-remove-q:hover { border-color: var(--red); color: var(--red); }
+
+.tfng-answer-btns { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.tfng-ans-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.15s;
+  text-align: center;
+}
+.tfng-ans-btn.selected-t { border-color: var(--green); background: var(--green-light); color: var(--green); }
+.tfng-ans-btn.selected-f { border-color: var(--red); background: var(--red-light); color: var(--red); }
+.tfng-ans-btn.selected-n { border-color: var(--amber); background: var(--amber-light); color: var(--amber); }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -1477,48 +1593,75 @@ main.quiz-active { max-width: 100% !important; padding: 0.75rem !important; }
       </div>
     </div>
 
-    <!-- QUIZ - split screen -->
-    <div id="page-quiz" class="page" style="max-width:100%;padding:0">
-      <div id="quiz-page" style="padding:1rem">
-        <!-- Top bar -->
-        <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:0.875rem 1.5rem;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+    <!-- QUIZ - FULLSCREEN split screen -->
+    <div id="page-quiz" class="page">
+      <!-- Top bar -->
+      <div style="background:var(--white);border-bottom:1px solid var(--border);padding:0.6rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:1rem">
+          <button onclick="backToExams()" style="padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:4px">✕ Thoát</button>
           <div>
             <div style="font-family:Fraunces,serif;font-size:1rem;font-weight:400" id="quiz-exam-title"></div>
-            <div style="font-size:0.78rem;color:var(--muted)" id="quiz-exam-sub"></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:1rem">
-            <div id="ielts-timer-wrap" class="hidden">
-              <span class="ielts-timer">⏱ <span id="ielts-timer-display">60:00</span></span>
-            </div>
-            <button class="btn-secondary" onclick="backToExams()" style="padding:6px 14px;font-size:0.82rem">← Thoát</button>
+            <div style="font-size:0.75rem;color:var(--muted)" id="quiz-exam-sub"></div>
           </div>
         </div>
-        <div class="progress-bar"><div class="progress-fill" id="quiz-progress-bar"></div></div>
-
-        <!-- Split layout -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;height:calc(100vh - 160px);min-height:480px;width:100%">
-          <!-- LEFT: passage -->
-          <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);overflow-y:auto;display:flex;flex-direction:column" id="quiz-passage-panel">
-            <div style="padding:1rem 1.5rem 0.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-              <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--green)">📖 Bài đọc</div>
-              <div style="display:flex;gap:6px;align-items:center">
-                <span style="font-size:0.72rem;color:var(--muted)">Bôi đen để highlight</span>
-                <button onclick="clearHighlights()" style="padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:none;cursor:pointer;font-size:0.72rem;color:var(--muted);font-family:inherit">Xoá highlight</button>
-              </div>
-            </div>
-            <div id="quiz-passage-content" style="font-size:0.9rem;line-height:1.9;color:var(--ink2);white-space:pre-wrap;padding:1.25rem 1.5rem;flex:1;overflow-y:auto;user-select:text;cursor:text" onmouseup="handleHighlight(event)"></div>
+        <div style="display:flex;align-items:center;gap:0.75rem">
+          <button id="tool-highlight-btn" onclick="toggleHighlightMode()" title="Highlight (H)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--white);cursor:pointer;font-family:inherit;font-size:0.8rem;display:flex;align-items:center;gap:5px;color:var(--muted);transition:all 0.15s">✏️ Highlight</button>
+          <button onclick="toggleNotePanel()" title="Ghi chú (N)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--white);cursor:pointer;font-family:inherit;font-size:0.8rem;display:flex;align-items:center;gap:5px;color:var(--muted);transition:all 0.15s">📝 Ghi chú</button>
+          <button onclick="clearHighlights()" style="padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.78rem;color:var(--muted)">Xoá highlight</button>
+          <div id="ielts-timer-wrap" class="hidden">
+            <span class="ielts-timer" style="font-family:Fraunces,serif;font-size:1.1rem;color:var(--ink)">⏱ <span id="ielts-timer-display">60:00</span></span>
           </div>
+        </div>
+      </div>
 
-          <!-- RIGHT: questions -->
-          <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--r);display:flex;flex-direction:column;overflow:hidden">
-            <div style="flex:1;overflow-y:auto" id="quiz-question-area"></div>
-            <div style="padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-              <div style="font-size:0.82rem;color:var(--muted)" id="quiz-progress-text">Câu 1/10</div>
+      <!-- Progress bar -->
+      <div class="progress-bar" style="margin:0;border-radius:0;height:3px;flex-shrink:0"><div class="progress-fill" id="quiz-progress-bar"></div></div>
+
+      <!-- Main split area -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;position:relative;min-height:0" id="quiz-split-area">
+
+        <!-- LEFT: passage -->
+        <div style="display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)" id="quiz-passage-panel">
+          <div style="padding:0.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--cream)">
+            <div id="passage-tabs" style="display:flex;gap:4px"></div>
+            <span style="font-size:0.7rem;color:var(--muted)">Bôi đen để highlight</span>
+          </div>
+          <div id="quiz-passage-content" style="font-size:0.9rem;line-height:1.9;color:var(--ink2);padding:1.25rem 1.5rem;flex:1;overflow-y:auto;user-select:text" onmouseup="handleHighlight(event)"></div>
+        </div>
+
+        <!-- RIGHT: questions -->
+        <div style="display:flex;flex-direction:column;overflow:hidden;background:var(--white)">
+          <div style="flex:1;overflow-y:auto" id="quiz-question-area"></div>
+          <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+            <div style="font-size:0.82rem;color:var(--muted)" id="quiz-progress-text">Câu 1/10</div>
+            <div style="display:flex;gap:0.5rem">
+              <button class="btn-secondary" id="quiz-prev-btn" onclick="prevQuestion()" style="padding:8px 16px;font-size:0.85rem">← Trước</button>
               <button class="btn-next" id="quiz-next-btn" onclick="nextQuestion()">Tiếp theo →</button>
             </div>
           </div>
         </div>
+
+        <!-- NOTE PANEL (overlay on right side) -->
+        <div id="note-panel" style="position:absolute;top:0;right:0;width:320px;height:100%;background:var(--white);border-left:1px solid var(--border);flex-direction:column;z-index:20;box-shadow:-4px 0 20px rgba(0,0,0,0.08)">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+            <div style="font-size:0.82rem;font-weight:600;color:var(--ink)">📝 Ghi chú của bạn</div>
+            <button onclick="toggleNotePanel()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted)">✕</button>
+          </div>
+          <textarea id="note-textarea" style="flex:1;border:none;padding:1rem 1.25rem;font-family:'DM Sans',sans-serif;font-size:0.875rem;line-height:1.7;color:var(--ink);background:var(--white);resize:none;outline:none;min-height:0" placeholder="Ghi chú nhanh tại đây...&#10;• Tóm tắt ý chính&#10;• Từ vựng cần nhớ&#10;• Vị trí đáp án trong bài đọc"></textarea>
+          <div style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted);flex-shrink:0">Ghi chú tự động lưu trong phiên làm bài</div>
+        </div>
       </div>
+
+      <!-- BOTTOM NAVIGATION BAR -->
+      <div style="background:var(--white);border-top:1px solid var(--border);padding:0.5rem 1rem;display:flex;align-items:center;gap:0.5rem;flex-shrink:0;overflow-x:auto" id="quiz-nav-bar">
+        <span style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);white-space:nowrap;margin-right:0.5rem">CÂU HỎI:</span>
+        <div id="quiz-nav-dots" style="display:flex;gap:4px;flex-wrap:nowrap"></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;flex-shrink:0">
+          <span style="font-size:0.72rem;color:var(--green);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span>Đã làm</span>
+          <span style="font-size:0.72rem;color:var(--blue);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:var(--blue);display:inline-block"></span>Hiện tại</span>
+        </div>
+      </div>
+
     </div>
 
     <!-- RESULT -->
@@ -1742,80 +1885,84 @@ main.quiz-active { max-width: 100% !important; padding: 0.75rem !important; }
         <button class="teacher-tab" onclick="switchTeacherTab('submissions')">📬 Bài nộp</button>
       </div>
 
-      <!-- Upload exam -->
+      <!-- Upload exam - MANUAL ENTRY -->
       <div id="teacher-upload" class="teacher-section active">
-        <div class="panel-card">
+
+        <!-- Exam info -->
+        <div class="panel-card" style="margin-bottom:0.75rem">
           <h3>Thông tin đề thi</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem">
-            <div class="form-group" style="margin:0">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 120px;gap:0.75rem;align-items:end">
+            <div>
               <label class="form-label">Tiêu đề</label>
-              <input type="text" class="form-input" id="t-exam-title" placeholder="VD: Đề tuần 1">
+              <input type="text" class="form-input" id="t-exam-title" placeholder="VD: Orange 20 Reading Test 1">
             </div>
-            <div class="form-group" style="margin:0">
+            <div>
               <label class="form-label">Chương trình</label>
               <select class="form-select" id="t-exam-track">
                 <option value="thpt">THPT</option>
                 <option value="ielts">IELTS</option>
               </select>
             </div>
-            <div class="form-group" style="margin:0">
+            <div>
               <label class="form-label">Tuần / Chủ đề</label>
               <input type="text" class="form-input" id="t-exam-week" placeholder="VD: Tuần 1">
             </div>
-          </div>
-          <div style="margin-top:0.75rem">
-            <label class="form-label">Thời gian làm bài (phút)</label>
-            <input type="number" class="form-input" id="t-exam-time" value="60" style="width:120px">
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-          <div class="panel-card" style="margin:0">
-            <h3>📋 Dán toàn bộ đề vào đây</h3>
-            <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem">Copy nguyên đề (bài đọc + câu hỏi) dán vào đây</p>
-            <textarea class="form-input" id="t-raw-exam" rows="14" placeholder="Dán toàn bộ nội dung đề thi vào đây..."></textarea>
-          </div>
-          <div class="panel-card" style="margin:0">
-            <h3>✅ Dán đáp án vào đây</h3>
-            <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem">Dán đáp án và giải thích (nếu có)</p>
-            <textarea class="form-input" id="t-raw-answers" rows="14" placeholder="VD:
-1. B
-2. tropical
-3. C - Giải thích: ...
-4. True
-5. A"></textarea>
-          </div>
-        </div>
-
-        <div class="panel-card" style="background:var(--green-light);border-color:#b7e4cc">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
             <div>
-              <div style="font-weight:600;font-size:0.95rem;color:var(--green)">🤖 AI phân tích đề tự động</div>
-              <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">AI tách bài đọc, câu hỏi, dạng câu (ABCD / điền từ / True-False) và đáp án — bạn kiểm tra rồi đăng</div>
+              <label class="form-label">Thời gian (phút)</label>
+              <input type="number" class="form-input" id="t-exam-time" value="60">
             </div>
-            <button class="btn-publish" style="margin:0;white-space:nowrap" onclick="aiParseExam()">✨ Phân tích đề</button>
           </div>
         </div>
 
-        <div id="ai-parse-loading" class="hidden" style="text-align:center;padding:2rem;color:var(--muted)">
-          <div style="font-size:2rem;margin-bottom:0.5rem">🤖</div>
-          <div>AI đang phân tích đề thi...</div>
-        </div>
+        <!-- Two column: passages left, questions right -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;min-height:600px">
 
-        <div id="exam-preview" class="hidden">
-          <div class="panel-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-              <h3>👁 Xem trước — Kiểm tra trước khi đăng</h3>
-              <button class="btn-publish" onclick="publishParsedExam()">🚀 Đăng đề thi</button>
+          <!-- LEFT: Passages -->
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <div class="panel-card" style="margin:0;flex:1;display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h3 style="margin:0">📖 Bài đọc</h3>
+                <div style="display:flex;gap:4px" id="passage-tab-btns">
+                  <button onclick="switchPassageTab(1)" id="ptab-1" style="padding:4px 12px;border-radius:999px;border:1.5px solid var(--green);background:var(--green);color:white;cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600">Passage 1</button>
+                  <button onclick="switchPassageTab(2)" id="ptab-2" style="padding:4px 12px;border-radius:999px;border:1.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.78rem">Passage 2</button>
+                  <button onclick="switchPassageTab(3)" id="ptab-3" style="padding:4px 12px;border-radius:999px;border:1.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.78rem">Passage 3</button>
+                </div>
+              </div>
+              <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem">Copy bài đọc (Reading Passage) dán vào đây. Dùng tối đa 3 passages.</p>
+              <textarea class="form-input" id="t-passage-1" rows="22" placeholder="Dán bài đọc Passage 1 vào đây..." style="flex:1;resize:none;font-size:0.85rem;line-height:1.7"></textarea>
+              <textarea class="form-input hidden" id="t-passage-2" rows="22" placeholder="Dán bài đọc Passage 2 vào đây..." style="flex:1;resize:none;font-size:0.85rem;line-height:1.7"></textarea>
+              <textarea class="form-input hidden" id="t-passage-3" rows="22" placeholder="Dán bài đọc Passage 3 vào đây..." style="flex:1;resize:none;font-size:0.85rem;line-height:1.7"></textarea>
             </div>
-            <div id="preview-passage-wrap" class="hidden">
-              <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:0.5rem">Bài đọc</div>
-              <div id="preview-passage" style="background:var(--cream);border-left:3px solid var(--green-mid);padding:1rem;border-radius:0 8px 8px 0;font-size:0.875rem;line-height:1.8;margin-bottom:1.5rem;white-space:pre-wrap"></div>
+          </div>
+
+          <!-- RIGHT: Questions -->
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <div class="panel-card" style="margin:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h3 style="margin:0">❓ Câu hỏi & Đáp án</h3>
+                <div style="display:flex;gap:0.5rem">
+                  <button onclick="addManualQuestion('mcq')" style="padding:5px 12px;border-radius:var(--r-sm);border:1.5px solid var(--blue);background:var(--blue-light);color:var(--blue);cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600">+ ABCD</button>
+                  <button onclick="addManualQuestion('tfng')" style="padding:5px 12px;border-radius:var(--r-sm);border:1.5px solid var(--green);background:var(--green-light);color:var(--green);cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600">+ T/F/NG</button>
+                  <button onclick="addManualQuestion('fill')" style="padding:5px 12px;border-radius:var(--r-sm);border:1.5px solid var(--amber);background:var(--amber-light);color:var(--amber);cursor:pointer;font-family:inherit;font-size:0.78rem;font-weight:600">+ Điền từ</button>
+                </div>
+              </div>
+              <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem">Chọn dạng câu hỏi bên trên để thêm. Mỗi câu có thể là ABCD, True/False/Not Given, hoặc Điền từ.</p>
+              <div id="manual-question-builder" style="max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:0.5rem">
+                <div id="no-questions-hint" style="text-align:center;padding:3rem 1rem;color:var(--muted);border:2px dashed var(--border);border-radius:var(--r)">
+                  <div style="font-size:2rem;margin-bottom:0.5rem">📝</div>
+                  <div style="font-size:0.875rem">Bấm <strong>+ ABCD</strong>, <strong>+ T/F/NG</strong> hoặc <strong>+ Điền từ</strong> để thêm câu hỏi</div>
+                </div>
+              </div>
             </div>
-            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:0.75rem">Câu hỏi (<span id="preview-q-count">0</span> câu)</div>
-            <div id="preview-questions"></div>
           </div>
         </div>
+
+        <!-- Publish button -->
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.75rem;align-items:center">
+          <span id="manual-q-count-label" style="font-size:0.85rem;color:var(--muted)">0 câu hỏi</span>
+          <button class="btn-publish" style="margin:0;padding:10px 28px;font-size:0.95rem" onclick="publishManualExam()">🚀 Đăng đề thi</button>
+        </div>
+
       </div>
 
       <!-- Classes -->
@@ -2180,11 +2327,8 @@ async function loadExams() {
 function createExamCard(id, exam) {
   const div = document.createElement('div');
   div.className = 'exam-card';
-  const isTeacher = TEACHER_EMAILS.includes(currentUser?.email);
+  div.onclick = () => startExam(id, exam);
   const qCount = exam.questions ? Object.keys(exam.questions).length : 0;
-
-  const delBtn = isTeacher ? `<button onclick="deleteExam('${id}',event)" style="padding:4px 10px;border:1px solid #fca5a5;background:#fef2f2;color:#dc2626;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:inherit">🗑 Xoá</button>` : '';
-
   div.innerHTML = `
     <div class="exam-week">${exam.week || ''}</div>
     <div class="exam-title">${exam.title}</div>
@@ -2194,29 +2338,17 @@ function createExamCard(id, exam) {
     </div>
     <div class="exam-footer">
       <span class="pill ${exam.track === 'ielts' ? 'pill-ielts-tag' : 'pill-new'}">${exam.track === 'ielts' ? 'IELTS' : 'THPT'}</span>
-      <div style="display:flex;align-items:center;gap:0.5rem">
-        <span style="font-size:0.8rem;color:var(--muted)">${formatDate(exam.createdAt)}</span>
-        ${delBtn}
-      </div>
+      <span style="font-size:0.8rem;color:var(--muted)">${formatDate(exam.createdAt)}</span>
     </div>
   `;
-  if (!isTeacher) div.onclick = () => startExam(id, exam);
-  else div.onclick = (e) => { if(e.target.tagName !== 'BUTTON') startExam(id, exam); };
   return div;
-}
-
-async function deleteExam(id, e) {
-  e.stopPropagation();
-  if (!confirm('Xoá đề thi này? Không thể khôi phục!')) return;
-  await db.ref('exams/' + id).remove();
-  showToast('✅ Đã xoá đề thi!');
-  loadExams();
-  loadDashboard();
 }
 
 // ═══════════════════════════════
 // QUIZ ENGINE
 // ═══════════════════════════════
+let highlightModeActive = false;
+
 function startExam(id, exam) {
   currentExam = { id, ...exam };
   quizQuestions = exam.questions ? Object.values(exam.questions) : [];
@@ -2228,15 +2360,19 @@ function startExam(id, exam) {
   document.getElementById('quiz-exam-title').textContent = exam.title;
   document.getElementById('quiz-exam-sub').textContent = exam.week || '';
 
-  // Passage panel
-  const passageEl = document.getElementById('quiz-passage-content');
-  const passagePanel = document.getElementById('quiz-passage-panel');
-  if (exam.passage) {
-    passageEl.textContent = exam.passage;
-    passagePanel.style.display = '';
-  } else {
-    passagePanel.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);text-align:center"><div style=\"font-size:3rem;margin-bottom:1rem\">📝</div><div style=\"font-size:0.9rem\">Đề này không có bài đọc</div></div>';
-  }
+  // Reset note
+  const noteArea = document.getElementById('note-textarea');
+  if (noteArea) noteArea.value = '';
+  const notePanel = document.getElementById('note-panel');
+  if (notePanel) notePanel.classList.remove('open');
+
+  // Reset highlight mode
+  highlightModeActive = false;
+  const hlBtn = document.getElementById('tool-highlight-btn');
+  if (hlBtn) hlBtn.classList.remove('active-tool');
+
+  // Build passage tabs
+  buildPassageTabs(exam);
 
   // IELTS timer
   if (exam.track === 'ielts' && exam.timeLimit) {
@@ -2249,8 +2385,94 @@ function startExam(id, exam) {
   }
 
   showPage('quiz');
-  document.querySelector('main').classList.add('quiz-active');
   renderQuestion();
+  buildNavDots();
+}
+
+function buildPassageTabs(exam) {
+  const tabsEl = document.getElementById('passage-tabs');
+  const contentEl = document.getElementById('quiz-passage-content');
+  if (!tabsEl || !contentEl) return;
+  tabsEl.innerHTML = '';
+  contentEl.innerHTML = '';
+
+  // Collect passages
+  const passages = [];
+  if (exam.passage) passages.push({ label: 'Passage 1', text: exam.passage });
+  if (exam.passage2) passages.push({ label: 'Passage 2', text: exam.passage2 });
+  if (exam.passage3) passages.push({ label: 'Passage 3', text: exam.passage3 });
+
+  if (!passages.length) {
+    contentEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);text-align:center"><div style="font-size:3rem;margin-bottom:1rem">📝</div><div style="font-size:0.9rem">Đề này không có bài đọc</div></div>';
+    return;
+  }
+
+  passages.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'passage-tab-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = p.label;
+    btn.onclick = () => {
+      tabsEl.querySelectorAll('.passage-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      contentEl.textContent = p.text;
+    };
+    tabsEl.appendChild(btn);
+  });
+
+  contentEl.style.whiteSpace = 'pre-wrap';
+  contentEl.textContent = passages[0].text;
+}
+
+function buildNavDots() {
+  const container = document.getElementById('quiz-nav-dots');
+  if (!container) return;
+  container.innerHTML = '';
+  quizQuestions.forEach((q, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'q-nav-dot' + (i === currentQuestionIndex ? ' current' : '');
+    dot.textContent = i + 1;
+    dot.id = 'nav-dot-' + i;
+    dot.onclick = () => {
+      currentQuestionIndex = i;
+      renderQuestion();
+      updateNavDots();
+    };
+    container.appendChild(dot);
+  });
+}
+
+function updateNavDots() {
+  quizQuestions.forEach((q, i) => {
+    const dot = document.getElementById('nav-dot-' + i);
+    if (!dot) return;
+    dot.className = 'q-nav-dot';
+    if (i === currentQuestionIndex) dot.classList.add('current');
+    else if (userAnswers[i] !== null) dot.classList.add('answered');
+  });
+}
+
+function toggleHighlightMode() {
+  highlightModeActive = !highlightModeActive;
+  const btn = document.getElementById('tool-highlight-btn');
+  const contentEl = document.getElementById('quiz-passage-content');
+  if (highlightModeActive) {
+    btn.classList.add('active-tool');
+    btn.textContent = '✏️ Tắt Highlight';
+    if (contentEl) contentEl.classList.add('highlight-mode');
+  } else {
+    btn.classList.remove('active-tool');
+    btn.textContent = '✏️ Highlight';
+    if (contentEl) contentEl.classList.remove('highlight-mode');
+  }
+}
+
+function toggleNotePanel() {
+  const panel = document.getElementById('note-panel');
+  if (!panel) return;
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('note-textarea')?.focus();
+  }
 }
 
 function renderQuestion() {
@@ -2260,122 +2482,82 @@ function renderQuestion() {
   document.getElementById('quiz-progress-bar').style.width = ((currentQuestionIndex + 1) / total * 100) + '%';
   const nextBtn = document.getElementById('quiz-next-btn');
   nextBtn.textContent = currentQuestionIndex === total - 1 ? 'Nộp bài ✓' : 'Tiếp theo →';
+  const prevBtn = document.getElementById('quiz-prev-btn');
+  if (prevBtn) prevBtn.style.visibility = currentQuestionIndex === 0 ? 'hidden' : 'visible';
+  updateNavDots();
 
   const type = q.type || 'mcq';
   const letters = ['A','B','C','D'];
-  let html = '<div style="padding:1.25rem">';
+  const saved = userAnswers[currentQuestionIndex]; // null or value
+
+  let html = '<div style="padding:1.25rem 1.5rem">';
   html += '<div class="question-num">Câu ' + (currentQuestionIndex+1) + ' / ' + total + '</div>';
   html += '<div class="question-text">' + q.question + '</div>';
 
   if (type === 'mcq') {
     html += '<div class="options">';
-    (q.options||[]).forEach((opt,i) => {
-      html += '<div class="option" id="opt-'+i+'" onclick="selectAnswer('+i+')">' +
+    (q.options||[]).forEach((opt, i) => {
+      const isSelected = saved === i;
+      html += '<div class="option' + (isSelected ? ' selected' : '') + '" id="opt-' + i + '" onclick="selectAnswer(' + i + ')">' +
         '<span class="option-letter">' + (letters[i]||i) + '</span>' +
         '<span>' + opt + '</span></div>';
     });
     html += '</div>';
+
   } else if (type === 'tfng') {
-    html += '<div style="display:flex;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap">';
-    const tfngCfg = [
-      ['✓ True','#16a34a','#f0fdf4','#86efac'],
-      ['✗ False','#dc2626','#fef2f2','#fca5a5'],
-      ['? Not Given','#b45309','#fef3c7','#fcd34d']
-    ];
-    tfngCfg.forEach((cfg,i) => {
-      html += '<button id="opt-'+i+'" onclick="selectAnswer('+i+')" style="flex:1;min-width:90px;padding:14px 8px;border:2px solid var(--border);border-radius:10px;background:var(--white);cursor:pointer;font-family:inherit;font-size:0.95rem;font-weight:600;color:var(--muted);transition:all 0.2s">' + cfg[0] + '</button>';
+    const labels = [['TRUE','✓ True'], ['FALSE','✗ False'], ['NOT GIVEN','? Not Given']];
+    html += '<div style="display:flex;gap:0.75rem;margin-top:0.5rem;flex-wrap:wrap">';
+    labels.forEach(([val, label], i) => {
+      const isSelected = saved === i;
+      html += '<button id="opt-' + i + '" onclick="selectAnswer(' + i + ')" style="flex:1;min-width:80px;padding:12px 8px;border:2px solid ' + (isSelected ? 'var(--green)' : 'var(--border)') + ';border-radius:8px;background:' + (isSelected ? 'var(--green-light)' : 'var(--white)') + ';cursor:pointer;font-family:inherit;font-size:0.9rem;font-weight:600;color:' + (isSelected ? 'var(--green)' : 'var(--muted)') + ';transition:all 0.15s">' + label + '</button>';
     });
     html += '</div>';
+
   } else if (type === 'fill') {
+    const savedVal = typeof saved === 'string' ? saved : '';
     html += '<div style="margin-top:0.75rem">' +
-      '<input type="text" id="fill-input" class="form-input" placeholder="Điền đáp án vào đây..." style="font-size:1rem;padding:12px 16px" onkeydown="if(event.key==String.fromCharCode(13))checkFill()">' +
-      '<button onclick="checkFill()" style="margin-top:0.5rem;padding:8px 20px;background:var(--green);color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit">Kiểm tra</button>' +
+      '<input type="text" id="fill-input" class="form-input" value="' + savedVal.replace(/"/g, '&quot;') + '" placeholder="Điền đáp án vào đây..." style="font-size:1rem;padding:12px 16px" ' +
+      'oninput="saveFillAnswer(this.value)" onkeydown="if(event.key===\'Enter\')nextQuestion()">' +
       '</div>';
   }
 
-  html += '<div class="explanation-box" id="explanation-box"></div></div>';
+  html += '</div>';
   document.getElementById('quiz-question-area').innerHTML = html;
-
-  if (userAnswers[currentQuestionIndex] !== null) {
-    const ans = userAnswers[currentQuestionIndex];
-    if (type === 'fill') restoreFill(ans, q.correctText, q.explanation);
-    else highlightAnswer(ans, q.correct, q.explanation);
-  }
 }
 
 function selectAnswer(idx) {
-  if (userAnswers[currentQuestionIndex] !== null) return;
+  // Allow changing answer before submit
   userAnswers[currentQuestionIndex] = idx;
   const q = quizQuestions[currentQuestionIndex];
-  highlightAnswer(idx, q.correct, q.explanation);
-}
+  const type = q.type || 'mcq';
 
-function highlightAnswer(selected, correct, explanation) {
-  const q = quizQuestions[currentQuestionIndex];
-  const type = q ? q.type : 'mcq';
-
-  if (type === 'tfng') {
-    const tfColors = ['#16a34a','#dc2626','#b45309'];
-    const tfBg = ['#f0fdf4','#fef2f2','#fef3c7'];
+  if (type === 'mcq') {
+    document.querySelectorAll('.option').forEach((o, i) => {
+      o.classList.toggle('selected', i === idx);
+    });
+  } else if (type === 'tfng') {
     [0,1,2].forEach(i => {
-      const btn = document.getElementById('opt-'+i);
+      const btn = document.getElementById('opt-' + i);
       if (!btn) return;
-      btn.disabled = true;
-      btn.dataset.sel = '1';
-      if (i === correct) {
-        btn.style.borderColor = tfColors[i];
-        btn.style.background = tfBg[i];
-        btn.style.color = tfColors[i];
-        btn.style.transform = 'scale(1.03)';
-      } else if (i === selected && selected !== correct) {
-        btn.style.borderColor = '#dc2626';
-        btn.style.background = '#fef2f2';
-        btn.style.color = '#dc2626';
-        btn.style.opacity = '0.7';
-        btn.style.textDecoration = 'line-through';
-      } else {
-        btn.style.opacity = '0.35';
-      }
-    });
-  } else {
-    document.querySelectorAll('.option').forEach((o,i) => {
-      o.classList.add('disabled');
-      if (i === correct) o.classList.add('correct');
-      else if (i === selected && selected !== correct) o.classList.add('wrong');
+      const isSelected = i === idx;
+      btn.style.borderColor = isSelected ? 'var(--green)' : 'var(--border)';
+      btn.style.background = isSelected ? 'var(--green-light)' : 'var(--white)';
+      btn.style.color = isSelected ? 'var(--green)' : 'var(--muted)';
     });
   }
-
-  const expBox = document.getElementById('explanation-box');
-  if (expBox) {
-    const isCorrect = selected === correct;
-    expBox.innerHTML = '<strong>' + (isCorrect ? '✅ Chính xác!' : '❌ Sai rồi!') + '</strong> ' + (explanation||'');
-    expBox.classList.add('show');
-  }
+  updateNavDots();
 }
 
-function checkFill() {
-  const q = quizQuestions[currentQuestionIndex];
-  if (userAnswers[currentQuestionIndex] !== null) return;
-  const input = document.getElementById('fill-input');
-  const val = input.value.trim();
-  if (!val) return;
-  userAnswers[currentQuestionIndex] = val;
-  restoreFill(val, q.correctText, q.explanation);
+function saveFillAnswer(val) {
+  userAnswers[currentQuestionIndex] = val.trim() || null;
+  updateNavDots();
 }
 
-function restoreFill(val, correctText, explanation) {
-  const input = document.getElementById('fill-input');
-  if (input) {
-    input.value = val;
-    input.disabled = true;
-    const correct = correctText && val.toLowerCase().trim() === correctText.toLowerCase().trim();
-    input.style.borderColor = correct ? 'var(--green)' : 'var(--red)';
-    input.style.background = correct ? 'var(--green-light)' : 'var(--red-light)';
+function prevQuestion() {
+  if (currentQuestionIndex > 0) {
+    currentQuestionIndex--;
+    renderQuestion();
   }
-  const expBox = document.getElementById('explanation-box');
-  const correct = correctText && val.toLowerCase().trim() === correctText.toLowerCase().trim();
-  expBox.innerHTML = '<strong>' + (correct ? '✅ Chính xác!' : '❌ Đáp án đúng: ' + (correctText||'')) + '</strong> ' + (explanation||'');
-  expBox.classList.add('show');
 }
 
 function nextQuestion() {
@@ -2434,7 +2616,6 @@ async function submitExam() {
     document.getElementById('res-band-label').textContent = 'Điểm /10';
   }
 
-  document.querySelector('main').classList.remove('quiz-active');
   showPage('result');
 }
 
@@ -2448,7 +2629,6 @@ function calcIeltsBand(pct, total) {
 
 function backToExams() {
   if (ieltTimer) clearInterval(ieltTimer);
-  document.querySelector('main').classList.remove('quiz-active');
   showPage('exams');
 }
 
@@ -2759,266 +2939,228 @@ function switchTeacherTab(tab) {
 }
 
 // ═══════════════════════════════
-// AI PARSE EXAM
+// MANUAL QUESTION BUILDER (Teacher)
 // ═══════════════════════════════
-let parsedExamData = null;
+let manualQuestions = []; // { id, type, question, options, correct, correctText, explanation, passageRef }
+let manualQCounter = 0;
 
-async function aiParseExam() {
-  const rawExam = document.getElementById('t-raw-exam').value.trim();
-  const rawAnswers = document.getElementById('t-raw-answers').value.trim();
-  const title = document.getElementById('t-exam-title').value.trim();
-
-  if (!rawExam) return showToast('Vui lòng dán nội dung đề thi!');
-  if (!rawAnswers) return showToast('Vui lòng dán đáp án!');
-  if (!title) return showToast('Vui lòng nhập tiêu đề đề!');
-
-  document.getElementById('ai-parse-loading').classList.remove('hidden');
-  document.getElementById('exam-preview').classList.add('hidden');
-
-  try {
-    const parsed = parseExamManually(rawExam, rawAnswers);
-    parsedExamData = parsed;
-    renderExamPreview(parsed);
-    showToast('✅ Đã phân tích ' + parsed.questions.length + ' câu hỏi!');
-  } catch(e) {
-    showToast('Lỗi phân tích: ' + e.message);
-  }
-
-  document.getElementById('ai-parse-loading').classList.add('hidden');
-}
-
-function parseExamManually(rawExam, rawAnswers) {
-  const lines = rawExam.split('\n').map(l => l.trim()).filter(l => l);
-  
-  // Detect passage: text before first question
-  let passageLines = [];
-  let questionStartIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^(question|câu|q)\s*\d+/i.test(lines[i]) || /^\d+[.)]/i.test(lines[i])) {
-      questionStartIdx = i;
-      break;
-    }
-    passageLines.push(lines[i]);
-  }
-  const passage = passageLines.join('\n').trim();
-
-  // Parse questions
-  const questions = [];
-  const qLines = questionStartIdx >= 0 ? lines.slice(questionStartIdx) : lines;
-  
-  let currentQ = null;
-  for (const line of qLines) {
-    // New question: starts with number or "Question N"
-    const qMatch = line.match(/^(?:question\s*)?(\d+)[.):\s]+(.+)/i);
-    if (qMatch) {
-      if (currentQ) questions.push(currentQ);
-      currentQ = { question: qMatch[2].trim(), options: [], type: 'fill', correct: 0, correctText: '', explanation: '' };
-      continue;
-    }
-    if (!currentQ) continue;
-    
-    // Option A/B/C/D
-    const optMatch = line.match(/^([A-Da-d])[.)\s]+(.+)/);
-    if (optMatch) {
-      currentQ.options.push(optMatch[2].trim());
-      currentQ.type = 'mcq';
-      continue;
-    }
-    
-    // True/False/Not Given options
-    if (/^(true|false|not given)/i.test(line) && currentQ.options.length < 3) {
-      if (!currentQ.options.includes('True')) currentQ.options = ['True','False','Not Given'];
-      currentQ.type = 'tfng';
-    }
-  }
-  if (currentQ) questions.push(currentQ);
-
-  // Parse answers
-  const answerLines = rawAnswers.split('\n').map(l => l.trim()).filter(l => l);
-  const answerMap = {};
-  for (const ans of answerLines) {
-    const m = ans.match(/^(\d+)[.):\s]+([A-Da-d]|true|false|not given|.+?)(?:\s*[-–]\s*(.+))?$/i);
-    if (m) {
-      answerMap[parseInt(m[1])] = { ans: m[2].trim(), exp: m[3]?.trim() || '' };
-    }
-  }
-
-  // Match answers to questions
-  questions.forEach((q, i) => {
-    const ans = answerMap[i + 1];
-    if (!ans) return;
-    if (q.type === 'mcq') {
-      const idx = ['a','b','c','d'].indexOf(ans.ans.toLowerCase());
-      q.correct = idx >= 0 ? idx : 0;
-      q.explanation = ans.exp;
-    } else if (q.type === 'tfng') {
-      const idx = ['true','false','not given'].indexOf(ans.ans.toLowerCase());
-      q.correct = idx >= 0 ? idx : 0;
-      q.explanation = ans.exp;
+function switchPassageTab(num) {
+  [1,2,3].forEach(n => {
+    const ta = document.getElementById('t-passage-' + n);
+    const btn = document.getElementById('ptab-' + n);
+    if (!ta || !btn) return;
+    if (n === num) {
+      ta.classList.remove('hidden');
+      btn.style.background = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'white';
     } else {
-      q.correctText = ans.ans;
-      q.explanation = ans.exp;
+      ta.classList.add('hidden');
+      btn.style.background = 'none';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.color = 'var(--muted)';
     }
   });
-
-  return { passage, questions };
 }
 
-function renderExamPreview(data) {
-  const passageWrap = document.getElementById('preview-passage-wrap');
-  if (data.passage && data.passage.trim()) {
-    document.getElementById('preview-passage').textContent = data.passage;
-    passageWrap.classList.remove('hidden');
-  } else {
-    passageWrap.classList.add('hidden');
+function addManualQuestion(type) {
+  manualQCounter++;
+  const id = manualQCounter;
+  const hint = document.getElementById('no-questions-hint');
+  if (hint) hint.remove();
+
+  const div = document.createElement('div');
+  div.className = 'manual-q-card';
+  div.id = 'mq-' + id;
+
+  const typeLabel = { mcq: 'Trắc nghiệm ABCD', tfng: 'True/False/Not Given', fill: 'Điền từ' }[type];
+  const typeCls = { mcq: 'q-type-mcq', tfng: 'q-type-tfng', fill: 'q-type-fill' }[type];
+  const qNum = document.querySelectorAll('.manual-q-card').length + 1;
+
+  let bodyHtml = '';
+
+  if (type === 'mcq') {
+    bodyHtml = `
+      <div style="margin-top:0.5rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi..." style="margin-bottom:0.5rem;font-size:0.875rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.4rem">
+          <input type="text" class="form-input" id="mq-opt-${id}-0" placeholder="A. ...">
+          <input type="text" class="form-input" id="mq-opt-${id}-1" placeholder="B. ...">
+          <input type="text" class="form-input" id="mq-opt-${id}-2" placeholder="C. ...">
+          <input type="text" class="form-input" id="mq-opt-${id}-3" placeholder="D. ...">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem">
+          <div>
+            <label class="form-label" style="font-size:0.72rem">Đáp án đúng</label>
+            <select class="form-select" id="mq-correct-${id}" style="font-size:0.82rem;padding:6px 10px">
+              <option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem">Giải thích (không bắt buộc)</label>
+            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." style="font-size:0.82rem;padding:6px 10px">
+          </div>
+        </div>
+      </div>`;
+  } else if (type === 'tfng') {
+    bodyHtml = `
+      <div style="margin-top:0.5rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi (statement)..." style="margin-bottom:0.5rem;font-size:0.875rem">
+        <div style="margin-bottom:0.4rem">
+          <label class="form-label" style="font-size:0.72rem">Đáp án đúng — bấm chọn:</label>
+          <div class="tfng-answer-btns">
+            <button class="tfng-ans-btn" id="mq-tfng-t-${id}" onclick="selectTFNG(${id},'TRUE')">✓ TRUE</button>
+            <button class="tfng-ans-btn" id="mq-tfng-f-${id}" onclick="selectTFNG(${id},'FALSE')">✗ FALSE</button>
+            <button class="tfng-ans-btn" id="mq-tfng-n-${id}" onclick="selectTFNG(${id},'NOT GIVEN')">? NOT GIVEN</button>
+          </div>
+          <input type="hidden" id="mq-tfng-val-${id}" value="">
+        </div>
+        <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích (không bắt buộc)..." style="font-size:0.82rem;padding:6px 10px">
+      </div>`;
+  } else if (type === 'fill') {
+    bodyHtml = `
+      <div style="margin-top:0.5rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Câu hỏi (VD: The bird is found in ___)" style="margin-bottom:0.5rem;font-size:0.875rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem">
+          <div>
+            <label class="form-label" style="font-size:0.72rem">Đáp án đúng</label>
+            <input type="text" class="form-input" id="mq-fill-ans-${id}" placeholder="VD: New Zealand" style="font-size:0.875rem">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.72rem">Giải thích (không bắt buộc)</label>
+            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." style="font-size:0.82rem;padding:6px 10px">
+          </div>
+        </div>
+      </div>`;
   }
 
-  document.getElementById('preview-q-count').textContent = data.questions.length;
-  const container = document.getElementById('preview-questions');
-  container.innerHTML = '';
-  const letters = ['A','B','C','D'];
-  const typeLabels = { mcq:'Trắc nghiệm ABCD', fill:'Điền từ', tfng:'True/False/NG' };
-  const typeColors = { mcq:'var(--blue)', fill:'var(--amber)', tfng:'var(--green)' };
+  div.innerHTML = `
+    <div class="q-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-weight:600;font-size:0.82rem;color:var(--muted)">Câu <span class="mq-num">${qNum}</span></span>
+        <span class="q-type-badge ${typeCls}">${typeLabel}</span>
+      </div>
+      <button class="btn-remove-q" onclick="removeManualQuestion(${id})">✕</button>
+    </div>
+    ${bodyHtml}
+  `;
 
-  data.questions.forEach((q, i) => {
-    const div = document.createElement('div');
-    div.style.cssText = 'padding:1rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.75rem;background:var(--cream)';
-    let answerHtml = '';
-    if (q.type === 'mcq' || q.type === 'tfng') {
-      answerHtml = (q.options||[]).map((o,oi) =>
-        '<div style="padding:4px 8px;margin-top:4px;border-radius:4px;font-size:0.85rem;background:' +
-        (oi===q.correct?'var(--green-light)':'transparent') + ';color:' +
-        (oi===q.correct?'var(--green)':'var(--ink2)') + ';font-weight:' +
-        (oi===q.correct?'600':'400') + '">' +
-        (letters[oi]||oi) + '. ' + o + (oi===q.correct?' ✓':'') + '</div>'
-      ).join('');
-    } else {
-      answerHtml = '<div style="margin-top:6px;font-size:0.85rem;color:var(--green);font-weight:600">Đáp án: ' + (q.correctText||'') + '</div>';
-    }
-    div.innerHTML =
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem">' +
-        '<span style="font-weight:600;font-size:0.875rem">Câu ' + (i+1) + '</span>' +
-        '<span style="padding:2px 10px;border-radius:999px;font-size:0.7rem;font-weight:600;background:var(--blue-light);color:' + (typeColors[q.type]||'var(--muted)') + '">' + (typeLabels[q.type]||q.type) + '</span>' +
-      '</div>' +
-      '<div style="font-size:0.9rem;margin-bottom:0.5rem">' + q.question + '</div>' +
-      answerHtml +
-      (q.explanation ? '<div style="margin-top:6px;font-size:0.8rem;color:var(--muted);font-style:italic">💡 ' + q.explanation + '</div>' : '');
-    container.appendChild(div);
-  });
-
-  document.getElementById('exam-preview').classList.remove('hidden');
-  document.getElementById('exam-preview').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('manual-question-builder').appendChild(div);
+  updateManualQCount();
+  // Focus first input
+  div.querySelector('input[type=text]')?.focus();
 }
 
-async function publishParsedExam() {
-  if (!parsedExamData) return showToast('Chưa có dữ liệu đề!');
+function selectTFNG(id, val) {
+  document.getElementById('mq-tfng-val-' + id).value = val;
+  ['TRUE','FALSE','NOT GIVEN'].forEach(v => {
+    const key = v === 'TRUE' ? 't' : v === 'FALSE' ? 'f' : 'n';
+    const btn = document.getElementById('mq-tfng-' + key + '-' + id);
+    if (!btn) return;
+    btn.className = 'tfng-ans-btn' + (v === val ? (' selected-' + key) : '');
+  });
+}
+
+function removeManualQuestion(id) {
+  document.getElementById('mq-' + id)?.remove();
+  // Re-number remaining
+  document.querySelectorAll('.manual-q-card .mq-num').forEach((el, i) => el.textContent = i + 1);
+  updateManualQCount();
+  if (!document.querySelectorAll('.manual-q-card').length) {
+    const hint = document.createElement('div');
+    hint.id = 'no-questions-hint';
+    hint.style.cssText = 'text-align:center;padding:3rem 1rem;color:var(--muted);border:2px dashed var(--border);border-radius:var(--r)';
+    hint.innerHTML = '<div style="font-size:2rem;margin-bottom:0.5rem">📝</div><div style="font-size:0.875rem">Bấm <strong>+ ABCD</strong>, <strong>+ T/F/NG</strong> hoặc <strong>+ Điền từ</strong> để thêm câu hỏi</div>';
+    document.getElementById('manual-question-builder').appendChild(hint);
+  }
+}
+
+function updateManualQCount() {
+  const n = document.querySelectorAll('.manual-q-card').length;
+  const el = document.getElementById('manual-q-count-label');
+  if (el) el.textContent = n + ' câu hỏi';
+}
+
+async function publishManualExam() {
   const title = document.getElementById('t-exam-title').value.trim();
   const track = document.getElementById('t-exam-track').value;
   const week = document.getElementById('t-exam-week').value.trim();
   const timeLimit = parseInt(document.getElementById('t-exam-time').value) || 60;
-  if (!title) return showToast('Vui lòng nhập tiêu đề!');
+  if (!title) return showToast('Vui lòng nhập tiêu đề đề thi!');
+
+  // Collect passages
+  const passage1 = document.getElementById('t-passage-1')?.value.trim() || null;
+  const passage2 = document.getElementById('t-passage-2')?.value.trim() || null;
+  const passage3 = document.getElementById('t-passage-3')?.value.trim() || null;
+  if (!passage1) return showToast('Vui lòng nhập bài đọc Passage 1!');
+
+  // Collect questions
+  const questions = [];
+  const cards = document.querySelectorAll('.manual-q-card');
+  if (!cards.length) return showToast('Vui lòng thêm ít nhất 1 câu hỏi!');
+
+  let hasError = false;
+  cards.forEach((card, i) => {
+    const id = card.id.replace('mq-', '');
+    const qText = document.getElementById('mq-text-' + id)?.value.trim();
+    if (!qText) { showToast('Câu ' + (i+1) + ': Chưa nhập nội dung câu hỏi!'); hasError = true; return; }
+
+    // Detect type from badge class
+    const badge = card.querySelector('.q-type-badge');
+    let type = 'fill';
+    if (badge?.classList.contains('q-type-mcq')) type = 'mcq';
+    else if (badge?.classList.contains('q-type-tfng')) type = 'tfng';
+
+    const exp = document.getElementById('mq-exp-' + id)?.value.trim() || '';
+
+    if (type === 'mcq') {
+      const opts = [0,1,2,3].map(j => document.getElementById('mq-opt-' + id + '-' + j)?.value.trim() || '');
+      if (opts.some(o => !o)) { showToast('Câu ' + (i+1) + ': Vui lòng điền đủ 4 phương án A B C D!'); hasError = true; return; }
+      const correct = parseInt(document.getElementById('mq-correct-' + id)?.value || '0');
+      questions.push({ type: 'mcq', question: qText, options: opts, correct, explanation: exp });
+    } else if (type === 'tfng') {
+      const val = document.getElementById('mq-tfng-val-' + id)?.value;
+      if (!val) { showToast('Câu ' + (i+1) + ': Chưa chọn đáp án True/False/Not Given!'); hasError = true; return; }
+      const tfMap = { 'TRUE': 0, 'FALSE': 1, 'NOT GIVEN': 2 };
+      questions.push({ type: 'tfng', question: qText, options: ['True','False','Not Given'], correct: tfMap[val] ?? 0, explanation: exp });
+    } else {
+      const correctText = document.getElementById('mq-fill-ans-' + id)?.value.trim();
+      if (!correctText) { showToast('Câu ' + (i+1) + ': Chưa nhập đáp án điền từ!'); hasError = true; return; }
+      questions.push({ type: 'fill', question: qText, correctText, explanation: exp });
+    }
+  });
+
+  if (hasError) return;
 
   await db.ref('exams').push({
     title, track, week,
-    passage: parsedExamData.passage || null,
+    passage: passage1,
+    passage2: passage2 || null,
+    passage3: passage3 || null,
     timeLimit: track === 'ielts' ? timeLimit : null,
     createdAt: Date.now(),
     createdBy: currentUser?.uid,
-    questions: parsedExamData.questions
-  });
-
-  showToast('✅ Đã đăng đề thi thành công!');
-  document.getElementById('t-exam-title').value = '';
-  document.getElementById('t-exam-week').value = '';
-  document.getElementById('t-raw-exam').value = '';
-  document.getElementById('t-raw-answers').value = '';
-  document.getElementById('exam-preview').classList.add('hidden');
-  parsedExamData = null;
-}
-
-// Question builder
-function addQuestion() {
-  questionCount++;
-  const qNum = questionCount;
-  const div = document.createElement('div');
-  div.className = 'q-row';
-  div.id = 'q-row-' + qNum;
-  div.innerHTML = `
-    <div class="q-row-header">
-      <span>Câu ${qNum}</span>
-      <button class="btn-remove" onclick="removeQuestion(${qNum})">✕</button>
-    </div>
-    <div class="form-group">
-      <input type="text" class="form-input" id="q-text-${qNum}" placeholder="Nội dung câu hỏi...">
-    </div>
-    <div class="options-grid">
-      <input type="text" class="form-input" id="q-opt-${qNum}-0" placeholder="A. Phương án A">
-      <input type="text" class="form-input" id="q-opt-${qNum}-1" placeholder="B. Phương án B">
-      <input type="text" class="form-input" id="q-opt-${qNum}-2" placeholder="C. Phương án C">
-      <input type="text" class="form-input" id="q-opt-${qNum}-3" placeholder="D. Phương án D">
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
-      <div class="form-group" style="margin:0">
-        <label class="form-label">Đáp án đúng</label>
-        <select class="form-select" id="q-correct-${qNum}">
-          <option value="0">A</option>
-          <option value="1">B</option>
-          <option value="2">C</option>
-          <option value="3">D</option>
-        </select>
-      </div>
-      <div class="form-group" style="margin:0">
-        <label class="form-label">Giải thích (không bắt buộc)</label>
-        <input type="text" class="form-input" id="q-exp-${qNum}" placeholder="Giải thích đáp án...">
-      </div>
-    </div>
-  `;
-  document.getElementById('question-builder').appendChild(div);
-}
-
-function removeQuestion(num) {
-  document.getElementById('q-row-' + num)?.remove();
-}
-
-async function publishExam() {
-  const title = document.getElementById('t-exam-title').value.trim();
-  const track = document.getElementById('t-exam-track').value;
-  const week = document.getElementById('t-exam-week').value.trim();
-  const passage = document.getElementById('t-exam-passage').value.trim();
-  const timeLimit = parseInt(document.getElementById('t-exam-time').value) || 60;
-
-  if (!title) return showToast('Vui lòng nhập tiêu đề đề!');
-
-  const questions = [];
-  document.querySelectorAll('.q-row').forEach(row => {
-    const id = row.id.replace('q-row-', '');
-    const question = document.getElementById('q-text-' + id)?.value.trim();
-    if (!question) return;
-    const options = [0,1,2,3].map(i => document.getElementById(`q-opt-${id}-${i}`)?.value.trim() || '');
-    const correct = parseInt(document.getElementById('q-correct-' + id)?.value || '0');
-    const explanation = document.getElementById('q-exp-' + id)?.value.trim() || '';
-    questions.push({ question, options, correct, explanation });
-  });
-
-  if (!questions.length) return showToast('Vui lòng thêm ít nhất 1 câu hỏi!');
-
-  const examData = {
-    title, track, week, passage: passage || null,
-    timeLimit: track === 'ielts' ? timeLimit : null,
-    createdAt: Date.now(), createdBy: currentUser?.uid,
     questions
-  };
+  });
 
-  await db.ref('exams').push(examData);
-  showToast('✅ Đã đăng đề thi thành công!');
-
-  // Reset form
+  showToast('✅ Đã đăng đề thi thành công! (' + questions.length + ' câu)');
+  // Reset
   document.getElementById('t-exam-title').value = '';
   document.getElementById('t-exam-week').value = '';
-  document.getElementById('t-exam-passage').value = '';
-  document.getElementById('question-builder').innerHTML = '';
-  questionCount = 0;
+  document.getElementById('t-passage-1').value = '';
+  document.getElementById('t-passage-2').value = '';
+  document.getElementById('t-passage-3').value = '';
+  document.getElementById('manual-question-builder').innerHTML = '';
+  const hint = document.createElement('div');
+  hint.id = 'no-questions-hint';
+  hint.style.cssText = 'text-align:center;padding:3rem 1rem;color:var(--muted);border:2px dashed var(--border);border-radius:var(--r)';
+  hint.innerHTML = '<div style="font-size:2rem;margin-bottom:0.5rem">📝</div><div style="font-size:0.875rem">Bấm <strong>+ ABCD</strong>, <strong>+ T/F/NG</strong> hoặc <strong>+ Điền từ</strong> để thêm câu hỏi</div>';
+  document.getElementById('manual-question-builder').appendChild(hint);
+  manualQCounter = 0;
+  updateManualQCount();
+  switchPassageTab(1);
 }
+
 
 async function loadStudents() {
   const snap = await db.ref('users').orderByChild('role').equalTo('student').get();
@@ -3657,6 +3799,7 @@ const HIGHLIGHT_COLORS = ['#fff176','#a5d6a7','#90caf9','#ffcc80','#f48fb1'];
 let highlightColorIdx = 0;
 
 function handleHighlight(e) {
+  if (!highlightModeActive) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.toString().trim() === '') return;
   const range = sel.getRangeAt(0);
