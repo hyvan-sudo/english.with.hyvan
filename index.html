@@ -2518,13 +2518,33 @@ async function submitExam() {
     : '(không ghi nhận)';
 
   // Save result (including time spent)
-  if (currentUser) {
-    await db.ref('results/' + currentUser.uid + '/' + currentExam.id).set({
-      examTitle: currentExam.title,
-      correct, total, pct,
-      track: currentExam.track,
-      timeSpent: totalElapsed > 0 ? totalElapsed : null,
-      completedAt: Date.now()
+  console.log('[HYVAN] submitExam called');
+  console.log('[HYVAN] currentUser:', currentUser?.uid);
+  console.log('[HYVAN] currentExam:', currentExam?.id);
+  console.log('[HYVAN] totalElapsed:', totalElapsed, 'seconds');
+  console.log('[HYVAN] correct:', correct, '/', total);
+
+  if (currentUser && db && currentExam?.id) {
+    try {
+      const saveData = {
+        examTitle: currentExam.title || '',
+        correct, total, pct,
+        track: currentExam.track || '',
+        timeSpent: totalElapsed > 0 ? totalElapsed : null,
+        completedAt: Date.now()
+      };
+      console.log('[HYVAN] Saving to Firebase:', saveData);
+      await db.ref('results/' + currentUser.uid + '/' + currentExam.id).set(saveData);
+      console.log('[HYVAN] ✅ Firebase save SUCCESS');
+    } catch(err) {
+      console.error('[HYVAN] ❌ Firebase save FAILED:', err);
+      showToast('Lỗi lưu kết quả: ' + err.message);
+    }
+  } else {
+    console.warn('[HYVAN] ⚠️ Cannot save - missing:', {
+      user: !!currentUser,
+      db: !!db,
+      examId: currentExam?.id
     });
   }
 
