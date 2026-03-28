@@ -2490,9 +2490,12 @@ async function submitExam() {
   if (ieltTimer) clearInterval(ieltTimer);
   if (elapsedTimer) clearInterval(elapsedTimer);
 
-  // Calculate elapsed time (guard against unset timestamp)
-  const rawElapsed = (examStartTimestamp > 0) ? Math.round((Date.now() - examStartTimestamp) / 1000) : elapsedSeconds;
-  const totalElapsed = (rawElapsed > 0 && rawElapsed < 86400) ? rawElapsed : 0;
+  // Calculate elapsed time using examStartTimestamp (most accurate)
+  let totalElapsed = elapsedSeconds; // fallback: counter from setInterval
+  if (examStartTimestamp > 0) {
+    const fromTimestamp = Math.round((Date.now() - examStartTimestamp) / 1000);
+    if (fromTimestamp > 0) totalElapsed = fromTimestamp;
+  }
   elapsedSeconds = totalElapsed;
 
   let correct = 0;
@@ -2510,9 +2513,9 @@ async function submitExam() {
   const pct = Math.round(correct / total * 100);
   const timeUsedMin = Math.floor(totalElapsed / 60);
   const timeUsedSec = totalElapsed % 60;
-  const timeStr = timeUsedMin > 0
-    ? `${timeUsedMin} phút ${timeUsedSec} giây`
-    : `${timeUsedSec} giây`;
+  const timeStr = totalElapsed > 0
+    ? (timeUsedMin > 0 ? `${timeUsedMin} phút ${timeUsedSec > 0 ? timeUsedSec + ' giây' : ''}` : `${timeUsedSec} giây`)
+    : '(không ghi nhận)';
 
   // Save result (including time spent)
   if (currentUser) {
@@ -2520,7 +2523,7 @@ async function submitExam() {
       examTitle: currentExam.title,
       correct, total, pct,
       track: currentExam.track,
-      timeSpent: totalElapsed,
+      timeSpent: totalElapsed > 0 ? totalElapsed : null,
       completedAt: Date.now()
     });
   }
