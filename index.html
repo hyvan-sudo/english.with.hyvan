@@ -2826,55 +2826,7 @@ function nextQuestion() {
   }
 }
 
-async function submitExam() {
-  if (ieltTimer) clearInterval(ieltTimer);
 
-  let correct = 0;
-  userAnswers.forEach((ans, i) => {
-    const q = quizQuestions[i];
-    const type = q.type || 'mcq';
-    if (type === 'fill') {
-      if (ans && q.correctText && ans.toLowerCase().trim() === q.correctText.toLowerCase().trim()) correct++;
-    } else {
-      if (ans === q.correct) correct++;
-    }
-  });
-
-  const total = quizQuestions.length;
-  const pct = Math.round(correct / total * 100);
-
-  // Save result
-  if (currentUser) {
-    await db.ref('results/' + currentUser.uid + '/' + currentExam.id).set({
-      examTitle: currentExam.title,
-      correct, total, pct,
-      track: currentExam.track,
-      completedAt: Date.now()
-    });
-  }
-
-  // Show result
-  document.getElementById('res-score').textContent = correct;
-  document.getElementById('res-total').textContent = '/' + total;
-  document.getElementById('res-correct').textContent = correct;
-  document.getElementById('res-wrong').textContent = total - correct;
-  document.getElementById('res-pct').textContent = pct + '%';
-
-  const titles = pct >= 80 ? 'Xuất sắc! 🎉' : pct >= 60 ? 'Khá tốt! 👍' : 'Cố gắng hơn nhé! 💪';
-  const rh = document.getElementById('result-heading'); if(rh) rh.textContent = titles;
-  document.getElementById('res-sub').textContent = `Bạn trả lời đúng ${correct}/${total} câu`;
-
-  if (currentExam.track === 'ielts') {
-    const band = calcIeltsBand(pct, total);
-    document.getElementById('res-band').textContent = band;
-    document.getElementById('res-band-label').textContent = 'Band IELTS';
-  } else {
-    document.getElementById('res-band').textContent = (correct * 10 / total).toFixed(1);
-    document.getElementById('res-band-label').textContent = 'Điểm /10';
-  }
-
-  showPage('result');
-}
 
 function calcIeltsBand(pct, total) {
   if (pct >= 90) return '8.5–9.0';
