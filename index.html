@@ -2490,8 +2490,9 @@ async function submitExam() {
   if (ieltTimer) clearInterval(ieltTimer);
   if (elapsedTimer) clearInterval(elapsedTimer);
 
-  // Calculate elapsed time
-  const totalElapsed = Math.round((Date.now() - examStartTimestamp) / 1000);
+  // Calculate elapsed time (guard against unset timestamp)
+  const rawElapsed = (examStartTimestamp > 0) ? Math.round((Date.now() - examStartTimestamp) / 1000) : elapsedSeconds;
+  const totalElapsed = (rawElapsed > 0 && rawElapsed < 86400) ? rawElapsed : 0;
   elapsedSeconds = totalElapsed;
 
   let correct = 0;
@@ -3737,19 +3738,25 @@ async function loadTeacherResults() {
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Đề thi</th>' +
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Điểm</th>' +
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Tỉ lệ</th>' +
-    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Thời gian</th>' +
+    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">⏱ Thời gian làm</th>' +
+    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Ngày nộp</th>' +
     '</tr>';
 
   rows.forEach(r => {
     const pct = r.pct || 0;
     const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
     const date = r.completedAt ? new Date(r.completedAt).toLocaleString('vi-VN') : '—';
+    const timeStr = (r.timeSpent && r.timeSpent > 0) ? (() => {
+      const m = Math.floor(r.timeSpent / 60), s = r.timeSpent % 60;
+      return m > 0 ? m + ' phút ' + (s > 0 ? s + ' giây' : '') : s + ' giây';
+    })() : '—';
     html += '<tr style="border-bottom:1px solid var(--border)">' +
       '<td style="padding:10px 12px;font-weight:500">' + r.userName + '</td>' +
       '<td style="padding:10px 12px;color:var(--muted)">' + (r.examTitle || '—') + '</td>' +
       '<td style="padding:10px 12px;font-weight:600;color:' + color + '">' + r.correct + '/' + r.total + '</td>' +
       '<td style="padding:10px 12px;color:' + color + '">' + pct + '%</td>' +
-      '<td style="padding:10px 12px;color:var(--muted);font-size:0.8rem">' + date + '</td>' +
+      '<td style="padding:10px 12px;color:var(--ink2);font-size:0.82rem;white-space:nowrap">' + timeStr + '</td>' +
+      '<td style="padding:10px 12px;color:var(--muted);font-size:0.8rem;white-space:nowrap">' + date + '</td>' +
       '</tr>';
   });
   html += '</table>';
