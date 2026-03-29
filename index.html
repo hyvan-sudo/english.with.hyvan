@@ -2152,6 +2152,7 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
       <div class="section-title">Bảng điều khiển Giáo viên</div>
       <div class="teacher-tabs">
         <button class="teacher-tab active" onclick="switchTeacherTab('upload')">📝 Đăng đề</button>
+        <button class="teacher-tab" onclick="switchTeacherTab('examlist')">📋 Quản lý đề</button>
         <button class="teacher-tab" onclick="switchTeacherTab('classes')">🏫 Quản lý lớp</button>
         <button class="teacher-tab" onclick="switchTeacherTab('results')">📊 Kết quả</button>
         <button class="teacher-tab" onclick="switchTeacherTab('students')">👥 Học sinh</button>
@@ -2230,12 +2231,28 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
           </div>
         </div>
 
-        <!-- Publish button -->
+        <!-- Publish / Save button -->
         <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.75rem;align-items:center">
           <span id="manual-q-count-label" style="font-size:0.85rem;color:var(--muted)">0 câu hỏi</span>
-          <button class="btn-publish" style="margin:0;padding:10px 28px;font-size:0.95rem" onclick="publishManualExam()">🚀 Đăng đề thi</button>
+          <button class="btn-secondary" id="cancel-edit-btn" style="display:none" onclick="cancelEditExam()">✕ Huỷ chỉnh sửa</button>
+          <button class="btn-publish" style="margin:0;padding:10px 28px;font-size:0.95rem" id="publish-exam-btn" onclick="publishManualExam()">🚀 Đăng đề thi</button>
         </div>
 
+      </div>
+
+      <!-- Exam List Management -->
+      <div id="teacher-examlist" class="teacher-section">
+        <div class="panel-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem">
+            <h3 style="margin:0">📋 Danh sách đề thi đã đăng</h3>
+            <div style="display:flex;gap:0.5rem">
+              <button onclick="filterTeacherExams('all')" id="ef-all" style="padding:5px 14px;border-radius:999px;border:1.5px solid var(--green);background:var(--green);color:white;cursor:pointer;font-family:inherit;font-size:0.8rem;font-weight:600">Tất cả</button>
+              <button onclick="filterTeacherExams('thpt')" id="ef-thpt" style="padding:5px 14px;border-radius:999px;border:1.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.8rem">THPT</button>
+              <button onclick="filterTeacherExams('ielts')" id="ef-ielts" style="padding:5px 14px;border-radius:999px;border:1.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.8rem">IELTS</button>
+            </div>
+          </div>
+          <div id="teacher-exam-list-container"><div class="loading-spinner">Đang tải...</div></div>
+        </div>
       </div>
 
       <!-- Classes -->
@@ -3450,7 +3467,7 @@ async function searchVocab() {
 // ═══════════════════════════════
 function switchTeacherTab(tab) {
   document.querySelectorAll('.teacher-tab').forEach((t, i) => {
-    const tabs = ['upload','classes','results','students','submissions'];
+    const tabs = ['upload','examlist','classes','results','students','submissions'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.teacher-section').forEach(s => s.classList.remove('active'));
@@ -3459,6 +3476,7 @@ function switchTeacherTab(tab) {
   if (tab === 'submissions') loadSubmissions();
   if (tab === 'classes') loadTeacherClasses();
   if (tab === 'results') loadTeacherResults();
+  if (tab === 'examlist') loadTeacherExamList();
 }
 
 // ═══════════════════════════════
@@ -3466,6 +3484,7 @@ function switchTeacherTab(tab) {
 // ═══════════════════════════════
 let manualQuestions = []; // { id, type, question, options, correct, correctText, explanation, passageRef }
 let manualQCounter = 0;
+let editingExamId = null; // null = creating new, string = editing existing
 
 function switchPassageTab(num) {
   [1,2,3].forEach(n => {
@@ -3486,7 +3505,7 @@ function switchPassageTab(num) {
   });
 }
 
-function addManualQuestion(type) {
+function addManualQuestion(type, prefill) {
   manualQCounter++;
   const id = manualQCounter;
   const hint = document.getElementById('no-questions-hint');
@@ -3500,58 +3519,72 @@ function addManualQuestion(type) {
   const typeCls = { mcq: 'q-type-mcq', tfng: 'q-type-tfng', fill: 'q-type-fill' }[type];
   const qNum = document.querySelectorAll('.manual-q-card').length + 1;
 
+  // Pre-fill values if editing
+  const pf = (prefill && typeof prefill === 'object') ? prefill : null;
+
   let bodyHtml = '';
 
   if (type === 'mcq') {
+    const opts = pf?.options || ['','','',''];
+    const correctVal = pf?.correct ?? 0;
+    const expVal = pf?.explanation || '';
     bodyHtml = `
       <div style="margin-top:0.5rem">
-        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi..." style="margin-bottom:0.5rem;font-size:0.875rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi..." value="${(pf?.question||'').replace(/"/g,'&quot;')}" style="margin-bottom:0.5rem;font-size:0.875rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.4rem">
-          <input type="text" class="form-input" id="mq-opt-${id}-0" placeholder="A. ...">
-          <input type="text" class="form-input" id="mq-opt-${id}-1" placeholder="B. ...">
-          <input type="text" class="form-input" id="mq-opt-${id}-2" placeholder="C. ...">
-          <input type="text" class="form-input" id="mq-opt-${id}-3" placeholder="D. ...">
+          <input type="text" class="form-input" id="mq-opt-${id}-0" placeholder="A. ..." value="${(opts[0]||'').replace(/"/g,'&quot;')}">
+          <input type="text" class="form-input" id="mq-opt-${id}-1" placeholder="B. ..." value="${(opts[1]||'').replace(/"/g,'&quot;')}">
+          <input type="text" class="form-input" id="mq-opt-${id}-2" placeholder="C. ..." value="${(opts[2]||'').replace(/"/g,'&quot;')}">
+          <input type="text" class="form-input" id="mq-opt-${id}-3" placeholder="D. ..." value="${(opts[3]||'').replace(/"/g,'&quot;')}">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem">
           <div>
             <label class="form-label" style="font-size:0.72rem">Đáp án đúng</label>
             <select class="form-select" id="mq-correct-${id}" style="font-size:0.82rem;padding:6px 10px">
-              <option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option>
+              <option value="0" ${correctVal===0?'selected':''}>A</option>
+              <option value="1" ${correctVal===1?'selected':''}>B</option>
+              <option value="2" ${correctVal===2?'selected':''}>C</option>
+              <option value="3" ${correctVal===3?'selected':''}>D</option>
             </select>
           </div>
           <div>
             <label class="form-label" style="font-size:0.72rem">Giải thích (không bắt buộc)</label>
-            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." style="font-size:0.82rem;padding:6px 10px">
+            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." value="${expVal.replace(/"/g,'&quot;')}" style="font-size:0.82rem;padding:6px 10px">
           </div>
         </div>
       </div>`;
   } else if (type === 'tfng') {
+    const expVal = pf?.explanation || '';
+    const tfVals = ['TRUE','FALSE','NOT GIVEN'];
+    const currentVal = pf?.correct !== undefined ? (tfVals[pf.correct] || '') : '';
     bodyHtml = `
       <div style="margin-top:0.5rem">
-        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi (statement)..." style="margin-bottom:0.5rem;font-size:0.875rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Nội dung câu hỏi (statement)..." value="${(pf?.question||'').replace(/"/g,'&quot;')}" style="margin-bottom:0.5rem;font-size:0.875rem">
         <div style="margin-bottom:0.4rem">
           <label class="form-label" style="font-size:0.72rem">Đáp án đúng — bấm chọn:</label>
           <div class="tfng-answer-btns">
-            <button class="tfng-ans-btn" id="mq-tfng-t-${id}" onclick="selectTFNG(${id},'TRUE')">✓ TRUE</button>
-            <button class="tfng-ans-btn" id="mq-tfng-f-${id}" onclick="selectTFNG(${id},'FALSE')">✗ FALSE</button>
-            <button class="tfng-ans-btn" id="mq-tfng-n-${id}" onclick="selectTFNG(${id},'NOT GIVEN')">? NOT GIVEN</button>
+            <button class="tfng-ans-btn${currentVal==='TRUE'?' selected-t':''}" id="mq-tfng-t-${id}" onclick="selectTFNG(${id},'TRUE')">✓ TRUE</button>
+            <button class="tfng-ans-btn${currentVal==='FALSE'?' selected-f':''}" id="mq-tfng-f-${id}" onclick="selectTFNG(${id},'FALSE')">✗ FALSE</button>
+            <button class="tfng-ans-btn${currentVal==='NOT GIVEN'?' selected-n':''}" id="mq-tfng-n-${id}" onclick="selectTFNG(${id},'NOT GIVEN')">? NOT GIVEN</button>
           </div>
-          <input type="hidden" id="mq-tfng-val-${id}" value="">
+          <input type="hidden" id="mq-tfng-val-${id}" value="${currentVal}">
         </div>
-        <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích (không bắt buộc)..." style="font-size:0.82rem;padding:6px 10px">
+        <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích (không bắt buộc)..." value="${expVal.replace(/"/g,'&quot;')}" style="font-size:0.82rem;padding:6px 10px">
       </div>`;
   } else if (type === 'fill') {
+    const expVal = pf?.explanation || '';
+    const ansVal = pf?.correctText || '';
     bodyHtml = `
       <div style="margin-top:0.5rem">
-        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Câu hỏi (VD: The bird is found in ___)" style="margin-bottom:0.5rem;font-size:0.875rem">
+        <input type="text" class="form-input" id="mq-text-${id}" placeholder="Câu hỏi (VD: The bird is found in ___)" value="${(pf?.question||'').replace(/"/g,'&quot;')}" style="margin-bottom:0.5rem;font-size:0.875rem">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem">
           <div>
             <label class="form-label" style="font-size:0.72rem">Đáp án đúng</label>
-            <input type="text" class="form-input" id="mq-fill-ans-${id}" placeholder="VD: New Zealand" style="font-size:0.875rem">
+            <input type="text" class="form-input" id="mq-fill-ans-${id}" placeholder="VD: New Zealand" value="${ansVal.replace(/"/g,'&quot;')}" style="font-size:0.875rem">
           </div>
           <div>
             <label class="form-label" style="font-size:0.72rem">Giải thích (không bắt buộc)</label>
-            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." style="font-size:0.82rem;padding:6px 10px">
+            <input type="text" class="form-input" id="mq-exp-${id}" placeholder="Giải thích..." value="${expVal.replace(/"/g,'&quot;')}" style="font-size:0.82rem;padding:6px 10px">
           </div>
         </div>
       </div>`;
@@ -3570,8 +3603,7 @@ function addManualQuestion(type) {
 
   document.getElementById('manual-question-builder').appendChild(div);
   updateManualQCount();
-  // Focus first input
-  div.querySelector('input[type=text]')?.focus();
+  if (!pf) div.querySelector('input[type=text]')?.focus();
 }
 
 function selectTFNG(id, val) {
@@ -3611,13 +3643,11 @@ async function publishManualExam() {
   const timeLimit = parseInt(document.getElementById('t-exam-time').value) || 60;
   if (!title) return showToast('Vui lòng nhập tiêu đề đề thi!');
 
-  // Collect passages
   const passage1 = document.getElementById('t-passage-1')?.value.trim() || null;
   const passage2 = document.getElementById('t-passage-2')?.value.trim() || null;
   const passage3 = document.getElementById('t-passage-3')?.value.trim() || null;
   if (!passage1) return showToast('Vui lòng nhập bài đọc Passage 1!');
 
-  // Collect questions
   const questions = [];
   const cards = document.querySelectorAll('.manual-q-card');
   if (!cards.length) return showToast('Vui lòng thêm ít nhất 1 câu hỏi!');
@@ -3628,7 +3658,6 @@ async function publishManualExam() {
     const qText = document.getElementById('mq-text-' + id)?.value.trim();
     if (!qText) { showToast('Câu ' + (i+1) + ': Chưa nhập nội dung câu hỏi!'); hasError = true; return; }
 
-    // Detect type from badge class
     const badge = card.querySelector('.q-type-badge');
     let type = 'fill';
     if (badge?.classList.contains('q-type-mcq')) type = 'mcq';
@@ -3655,21 +3684,38 @@ async function publishManualExam() {
 
   if (hasError) return;
 
-  await db.ref('exams').push({
+  const examData = {
     title, track, week,
     passage: passage1,
     passage2: passage2 || null,
     passage3: passage3 || null,
-    timeLimit: track === 'ielts' ? timeLimit : null,
-    createdAt: Date.now(),
-    createdBy: currentUser?.uid,
+    timeLimit,
     questions
-  });
+  };
 
-  showToast('✅ Đã đăng đề thi thành công! (' + questions.length + ' câu)');
-  // Reset
+  if (editingExamId) {
+    // UPDATE existing exam
+    examData.updatedAt = Date.now();
+    await db.ref('exams/' + editingExamId).update(examData);
+    showToast('✅ Đã cập nhật đề thi! (' + questions.length + ' câu)');
+    editingExamId = null;
+  } else {
+    // CREATE new exam
+    examData.createdAt = Date.now();
+    examData.createdBy = currentUser?.uid;
+    await db.ref('exams').push(examData);
+    showToast('✅ Đã đăng đề thi thành công! (' + questions.length + ' câu)');
+  }
+
+  resetExamForm();
+}
+
+function resetExamForm() {
+  editingExamId = null;
   document.getElementById('t-exam-title').value = '';
   document.getElementById('t-exam-week').value = '';
+  document.getElementById('t-exam-time').value = '60';
+  document.getElementById('t-exam-track').value = 'thpt';
   document.getElementById('t-passage-1').value = '';
   document.getElementById('t-passage-2').value = '';
   document.getElementById('t-passage-3').value = '';
@@ -3682,6 +3728,176 @@ async function publishManualExam() {
   manualQCounter = 0;
   updateManualQCount();
   switchPassageTab(1);
+  // Reset button labels
+  const publishBtn = document.getElementById('publish-exam-btn');
+  const cancelBtn = document.getElementById('cancel-edit-btn');
+  if (publishBtn) publishBtn.textContent = '🚀 Đăng đề thi';
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  // Reset form title
+  const formTitle = document.getElementById('exam-form-heading');
+  if (formTitle) formTitle.textContent = 'Thông tin đề thi';
+}
+
+function cancelEditExam() {
+  if (confirm('Huỷ chỉnh sửa? Mọi thay đổi sẽ mất.')) {
+    resetExamForm();
+    switchTeacherTab('examlist');
+  }
+}
+
+// ── LOAD ALL EXAMS FOR TEACHER ──
+let allTeacherExams = [];
+let currentExamFilter = 'all';
+
+async function loadTeacherExamList() {
+  const container = document.getElementById('teacher-exam-list-container');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-spinner">Đang tải...</div>';
+
+  const snap = await db.ref('exams').get();
+  allTeacherExams = [];
+  if (snap.exists()) {
+    Object.entries(snap.val()).forEach(([id, exam]) => {
+      allTeacherExams.push({ id, ...exam });
+    });
+    allTeacherExams.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  renderTeacherExamList();
+}
+
+function filterTeacherExams(filter) {
+  currentExamFilter = filter;
+  ['all','thpt','ielts'].forEach(f => {
+    const btn = document.getElementById('ef-' + f);
+    if (!btn) return;
+    const active = f === filter;
+    btn.style.background = active ? 'var(--green)' : 'none';
+    btn.style.color = active ? 'white' : 'var(--muted)';
+    btn.style.borderColor = active ? 'var(--green)' : 'var(--border)';
+    btn.style.fontWeight = active ? '600' : '400';
+  });
+  renderTeacherExamList();
+}
+
+function renderTeacherExamList() {
+  const container = document.getElementById('teacher-exam-list-container');
+  if (!container) return;
+
+  const filtered = currentExamFilter === 'all'
+    ? allTeacherExams
+    : allTeacherExams.filter(e => e.track === currentExamFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>Chưa có đề thi nào</h3><p>Bấm vào tab "Đăng đề" để tạo đề mới.</p></div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  filtered.forEach(exam => {
+    const qCount = exam.questions ? (Array.isArray(exam.questions) ? exam.questions.length : Object.keys(exam.questions).length) : 0;
+    const trackBadge = exam.track === 'ielts'
+      ? '<span style="padding:2px 10px;border-radius:999px;font-size:0.72rem;font-weight:700;background:var(--amber-light);color:var(--amber)">IELTS</span>'
+      : '<span style="padding:2px 10px;border-radius:999px;font-size:0.72rem;font-weight:700;background:var(--blue-light);color:var(--blue)">THPT</span>';
+
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;background:var(--white);border:1px solid var(--border);border-radius:var(--r);margin-bottom:0.625rem;transition:box-shadow 0.15s';
+    div.onmouseenter = () => div.style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)';
+    div.onmouseleave = () => div.style.boxShadow = '';
+
+    div.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:4px;flex-wrap:wrap">
+          ${trackBadge}
+          ${exam.week ? '<span style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + exam.week + '</span>' : ''}
+        </div>
+        <div style="font-family:Fraunces,serif;font-size:1rem;font-weight:400;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${exam.title}</div>
+        <div style="font-size:0.75rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap">
+          <span>${qCount} câu hỏi</span>
+          ${exam.timeLimit ? '<span>⏱ ' + exam.timeLimit + ' phút</span>' : ''}
+          <span>${exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('vi-VN') : ''}</span>
+          ${exam.updatedAt ? '<span style="color:var(--amber)">✏️ Đã sửa ' + new Date(exam.updatedAt).toLocaleDateString('vi-VN') + '</span>' : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-shrink:0">
+        <button onclick="editExam('${exam.id}')" style="padding:7px 16px;border:1.5px solid var(--green);border-radius:var(--r-sm);background:var(--green-light);color:var(--green);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.15s" onmouseenter="this.style.background='var(--green)';this.style.color='white'" onmouseleave="this.style.background='var(--green-light)';this.style.color='var(--green)'">✏️ Sửa</button>
+        <button onclick="deleteExam('${exam.id}','${exam.title.replace(/'/g,"\\'")}',this)" style="padding:7px 16px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:none;color:var(--muted);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.15s" onmouseenter="this.style.borderColor='var(--red)';this.style.color='var(--red)';this.style.background='var(--red-light)'" onmouseleave="this.style.borderColor='var(--border)';this.style.color='var(--muted)';this.style.background='none'">🗑 Xoá</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function editExam(examId) {
+  const snap = await db.ref('exams/' + examId).get();
+  if (!snap.exists()) return showToast('Không tìm thấy đề thi!');
+  const exam = snap.val();
+
+  editingExamId = examId;
+
+  // Switch to upload tab
+  switchTeacherTab('upload');
+
+  // Fill form info
+  document.getElementById('t-exam-title').value = exam.title || '';
+  document.getElementById('t-exam-track').value = exam.track || 'thpt';
+  document.getElementById('t-exam-week').value = exam.week || '';
+  document.getElementById('t-exam-time').value = exam.timeLimit || 60;
+
+  // Fill passages
+  document.getElementById('t-passage-1').value = exam.passage || '';
+  document.getElementById('t-passage-2').value = exam.passage2 || '';
+  document.getElementById('t-passage-3').value = exam.passage3 || '';
+  switchPassageTab(1);
+
+  // Clear question builder and fill with existing questions
+  document.getElementById('manual-question-builder').innerHTML = '';
+  manualQCounter = 0;
+
+  const questions = exam.questions
+    ? (Array.isArray(exam.questions) ? exam.questions : Object.values(exam.questions))
+    : [];
+
+  questions.forEach(q => {
+    addManualQuestion(q.type || 'mcq', q);
+  });
+
+  updateManualQCount();
+
+  // Update button labels
+  const publishBtn = document.getElementById('publish-exam-btn');
+  const cancelBtn = document.getElementById('cancel-edit-btn');
+  if (publishBtn) publishBtn.textContent = '💾 Lưu chỉnh sửa';
+  if (cancelBtn) cancelBtn.style.display = '';
+
+  // Scroll to top of form
+  document.getElementById('page-teacher').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('✏️ Đang chỉnh sửa: ' + exam.title);
+}
+
+async function deleteExam(examId, examTitle, btn) {
+  // Two-step confirm
+  if (btn.dataset.confirmPending) {
+    // Second click = confirm delete
+    await db.ref('exams/' + examId).remove();
+    showToast('🗑 Đã xoá đề: ' + examTitle);
+    allTeacherExams = allTeacherExams.filter(e => e.id !== examId);
+    renderTeacherExamList();
+  } else {
+    btn.dataset.confirmPending = '1';
+    btn.textContent = '⚠️ Xác nhận xoá?';
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color = 'var(--red)';
+    btn.style.background = 'var(--red-light)';
+    setTimeout(() => {
+      if (btn.dataset.confirmPending) {
+        delete btn.dataset.confirmPending;
+        btn.textContent = '🗑 Xoá';
+        btn.style.borderColor = 'var(--border)';
+        btn.style.color = 'var(--muted)';
+        btn.style.background = 'none';
+      }
+    }, 3000);
+  }
 }
 
 
