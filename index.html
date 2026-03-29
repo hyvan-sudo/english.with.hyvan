@@ -2698,6 +2698,7 @@ let currentChatRef = null;
 let questionCount = 0;
 let quizStartTime = null;
 let quizTimeTaken = 0; // seconds
+let writingStartTime = null; // for writing time tracking
 let currentPinnedMsgKey = null;
 
 // ═══════════════════════════════
@@ -4596,18 +4597,26 @@ async function loadTeacherResults() {
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Đề thi</th>' +
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Điểm</th>' +
     '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Tỉ lệ</th>' +
-    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Thời gian</th>' +
+    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">⏱ Thời gian làm</th>' +
+    '<th style="padding:10px 12px;border-bottom:1px solid var(--border)">Nộp lúc</th>' +
     '</tr>';
 
   rows.forEach(r => {
     const pct = r.pct || 0;
     const color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
     const date = r.completedAt ? new Date(r.completedAt).toLocaleString('vi-VN') : '—';
+    let timeTakenStr = '—';
+    if (r.timeTaken && r.timeTaken > 0) {
+      const tm = Math.floor(r.timeTaken / 60);
+      const ts = r.timeTaken % 60;
+      timeTakenStr = tm > 0 ? (tm + ' phút ' + ts + ' giây') : (ts + ' giây');
+    }
     html += '<tr style="border-bottom:1px solid var(--border)">' +
       '<td style="padding:10px 12px;font-weight:500">' + r.userName + '</td>' +
       '<td style="padding:10px 12px;color:var(--muted)">' + (r.examTitle || '—') + '</td>' +
       '<td style="padding:10px 12px;font-weight:600;color:' + color + '">' + r.correct + '/' + r.total + '</td>' +
       '<td style="padding:10px 12px;color:' + color + '">' + pct + '%</td>' +
+      '<td style="padding:10px 12px;color:var(--ink2);font-weight:500">' + timeTakenStr + '</td>' +
       '<td style="padding:10px 12px;color:var(--muted);font-size:0.8rem">' + date + '</td>' +
       '</tr>';
   });
@@ -5062,6 +5071,7 @@ async function openWritingEditor(taskId, task, existingSub) {
     textarea.value = ''; textarea.disabled = false; textarea.style.background = '';
     submitArea.style.display = ''; submittedNotice.style.display = 'none'; feedbackPanel.style.display = 'none';
     updateWordCount(''); textarea.focus();
+    writingStartTime = Date.now(); // start timer
   }
 }
 
@@ -5093,6 +5103,7 @@ async function submitWriting() {
   }
   const btn = document.getElementById('writing-submit-btn');
   btn.disabled = true; btn.textContent = 'Đang nộp...';
+  const writingTimeTaken = writingStartTime ? Math.floor((Date.now() - writingStartTime) / 1000) : 0;
   await db.ref('writingSubmissions/' + currentWritingTask.id + '/' + currentUser.uid).set({
     essay, wordCount,
     studentName: currentUserData?.name || 'Học sinh',
@@ -5100,6 +5111,7 @@ async function submitWriting() {
     taskTitle: currentWritingTask.title,
     taskType: currentWritingTask.type,
     submittedAt: Date.now(),
+    timeTaken: writingTimeTaken,
     feedback: null, band: null
   });
   document.getElementById('writing-submit-area').style.display = 'none';
@@ -5175,7 +5187,7 @@ async function loadWritingSubmissions() {
             <span class="writing-task-badge ${hasFeedback?'badge-feedback':'badge-pending'}">${hasFeedback?'📬 Đã chấm':'⏳ Chờ chấm'}</span>
           </div>
           <div style="font-weight:600;font-size:0.9rem">${sub.studentName}</div>
-          <div style="font-size:0.78rem;color:var(--muted)">${sub.taskTitle||''} · ${sub.wordCount||0} từ · ${date}</div>
+          <div style="font-size:0.78rem;color:var(--muted)">${sub.taskTitle||''} · ${sub.wordCount||0} từ · ${date}${sub.timeTaken && sub.timeTaken > 0 ? ' · ⏱ ' + (Math.floor(sub.timeTaken/60) > 0 ? Math.floor(sub.timeTaken/60) + ' phút ' + (sub.timeTaken%60) + ' giây' : sub.timeTaken + ' giây') : ''}</div>
         </div>
         <button onclick="openAiModal('${sub.taskId}','${sub.studentUid}')"
           style="padding:8px 18px;border:1.5px solid var(--green);border-radius:var(--r-sm);background:var(--green-light);color:var(--green);cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600"
@@ -5194,7 +5206,10 @@ async function openAiModal(taskId, studentUid) {
   if (!snap.exists()) return showToast('Không tìm thấy bài nộp!');
   const sub = snap.val();
   aiModalData = { taskId, studentUid, ...sub };
-  document.getElementById('ai-modal-student-name').textContent = sub.studentName + ' · ' + (sub.taskTitle||'') + ' · ' + (sub.wordCount||0) + ' từ';
+  const writingTimeStr = sub.timeTaken && sub.timeTaken > 0
+    ? ' · ⏱ ' + (Math.floor(sub.timeTaken/60) > 0 ? Math.floor(sub.timeTaken/60) + ' phút ' + (sub.timeTaken%60) + ' giây' : sub.timeTaken + ' giây')
+    : '';
+  document.getElementById('ai-modal-student-name').textContent = sub.studentName + ' · ' + (sub.taskTitle||'') + ' · ' + (sub.wordCount||0) + ' từ' + writingTimeStr;
   document.getElementById('ai-modal-essay').textContent = sub.essay || '';
   document.getElementById('teacher-feedback-text').value = sub.feedback || '';
   document.getElementById('teacher-feedback-band').value = sub.band || '';
