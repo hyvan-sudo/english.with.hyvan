@@ -1283,12 +1283,33 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
 }
 
 
-/* Highlight mode active */
+/* Highlight mode */
 #quiz-passage-content.highlight-mode { cursor: crosshair; }
-#tool-highlight-btn.active-tool {
-  background: #fff176 !important;
-  border-color: #f9a825 !important;
-  color: var(--ink) !important;
+#quiz-question-area.highlight-mode { cursor: crosshair; }
+
+/* Highlight color picker */
+.hl-swatch {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  outline: none;
+}
+.hl-swatch:hover { transform: scale(1.25); }
+.hl-swatch.active-swatch {
+  border-color: var(--ink);
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px var(--white) inset;
+}
+#highlight-toolbar.hl-active {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+#highlight-toolbar.hl-active #tool-highlight-btn {
+  color: var(--green);
+  font-weight: 600;
 }
 
 /* Bottom nav dots */
@@ -2008,7 +2029,14 @@ function goToSplash() {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.75rem">
-          <button id="tool-highlight-btn" onclick="toggleHighlightMode()" title="Highlight (H)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--white);cursor:pointer;font-family:inherit;font-size:0.8rem;display:flex;align-items:center;gap:5px;color:var(--muted);transition:all 0.15s">✏️ Highlight</button>
+          <!-- Highlight toolbar group -->
+          <div id="highlight-toolbar" style="display:flex;align-items:center;gap:6px;padding:5px 10px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--white);transition:all 0.15s">
+            <button id="tool-highlight-btn" onclick="toggleHighlightMode()" title="Bật/tắt Highlight" style="padding:0;border:none;background:none;cursor:pointer;font-size:0.8rem;font-family:inherit;color:var(--muted);display:flex;align-items:center;gap:4px;transition:color 0.15s;white-space:nowrap">✏️ Highlight</button>
+            <div style="width:1px;height:18px;background:var(--border);margin:0 2px"></div>
+            <div id="hl-color-palette" style="display:flex;align-items:center;gap:5px">
+              <!-- Color swatches injected by JS -->
+            </div>
+          </div>
           <button onclick="toggleNotePanel()" title="Ghi chú (N)" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--white);cursor:pointer;font-family:inherit;font-size:0.8rem;display:flex;align-items:center;gap:5px;color:var(--muted);transition:all 0.15s">📝 Ghi chú</button>
           <button onclick="clearHighlights()" style="padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.78rem;color:var(--muted)">Xoá highlight</button>
           <div id="ielts-timer-wrap" class="hidden">
@@ -2034,7 +2062,7 @@ function goToSplash() {
 
         <!-- RIGHT: questions -->
         <div style="display:flex;flex-direction:column;overflow:hidden;background:var(--white)">
-          <div style="flex:1;overflow-y:auto" id="quiz-question-area"></div>
+          <div style="flex:1;overflow-y:auto;user-select:text" id="quiz-question-area" onmouseup="handleHighlight(event)"></div>
           <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
             <div style="font-size:0.82rem;color:var(--muted)" id="quiz-progress-text">Câu 1/10</div>
             <div style="display:flex;gap:0.5rem">
@@ -3084,8 +3112,12 @@ function _doStartExam(id, exam) {
 
   // Reset highlight mode
   highlightModeActive = false;
+  selectedHighlightColor = HIGHLIGHT_COLORS[0].hex;
   const hlBtn = document.getElementById('tool-highlight-btn');
-  if (hlBtn) hlBtn.classList.remove('active-tool');
+  if (hlBtn) hlBtn.textContent = '✏️ Highlight';
+  const toolbar = document.getElementById('highlight-toolbar');
+  if (toolbar) toolbar.classList.remove('hl-active');
+  initHighlightPalette();
 
   // Build passage tabs
   buildPassageTabs(exam);
@@ -3170,15 +3202,19 @@ function updateNavDots() {
 function toggleHighlightMode() {
   highlightModeActive = !highlightModeActive;
   const btn = document.getElementById('tool-highlight-btn');
-  const contentEl = document.getElementById('quiz-passage-content');
+  const passageEl = document.getElementById('quiz-passage-content');
+  const questionEl = document.getElementById('quiz-question-area');
+  const toolbar = document.getElementById('highlight-toolbar');
   if (highlightModeActive) {
-    btn.classList.add('active-tool');
-    btn.textContent = '✏️ Tắt Highlight';
-    if (contentEl) contentEl.classList.add('highlight-mode');
+    if (toolbar) toolbar.classList.add('hl-active');
+    if (btn) btn.textContent = '✏️ Tắt Highlight';
+    if (passageEl) passageEl.classList.add('highlight-mode');
+    if (questionEl) questionEl.classList.add('highlight-mode');
   } else {
-    btn.classList.remove('active-tool');
-    btn.textContent = '✏️ Highlight';
-    if (contentEl) contentEl.classList.remove('highlight-mode');
+    if (toolbar) toolbar.classList.remove('hl-active');
+    if (btn) btn.textContent = '✏️ Highlight';
+    if (passageEl) passageEl.classList.remove('highlight-mode');
+    if (questionEl) questionEl.classList.remove('highlight-mode');
   }
 }
 
@@ -4918,24 +4954,68 @@ async function sendSticker(stickerSrc) {
 // ═══════════════════════════════
 // HIGHLIGHT FEATURE
 // ═══════════════════════════════
-const HIGHLIGHT_COLORS = ['#fff176','#a5d6a7','#90caf9','#ffcc80','#f48fb1'];
+const HIGHLIGHT_COLORS = [
+  { hex: '#fff176', label: 'Vàng' },
+  { hex: '#a5d6a7', label: 'Xanh lá' },
+  { hex: '#90caf9', label: 'Xanh dương' },
+  { hex: '#ffcc80', label: 'Cam' },
+  { hex: '#f48fb1', label: 'Hồng' },
+  { hex: '#ce93d8', label: 'Tím' },
+];
 let highlightColorIdx = 0;
+let selectedHighlightColor = HIGHLIGHT_COLORS[0].hex;
+
+function initHighlightPalette() {
+  const palette = document.getElementById('hl-color-palette');
+  if (!palette) return;
+  palette.innerHTML = '';
+  HIGHLIGHT_COLORS.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'hl-swatch' + (i === 0 ? ' active-swatch' : '');
+    btn.style.background = c.hex;
+    btn.title = c.label;
+    btn.setAttribute('aria-label', 'Màu ' + c.label);
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      selectedHighlightColor = c.hex;
+      document.querySelectorAll('.hl-swatch').forEach(s => s.classList.remove('active-swatch'));
+      btn.classList.add('active-swatch');
+      // Auto-enable highlight mode when picking a color
+      if (!highlightModeActive) {
+        highlightModeActive = true;
+        const passageEl = document.getElementById('quiz-passage-content');
+        const questionEl = document.getElementById('quiz-question-area');
+        if (passageEl) passageEl.classList.add('highlight-mode');
+        if (questionEl) questionEl.classList.add('highlight-mode');
+        const toolbar = document.getElementById('highlight-toolbar');
+        if (toolbar) toolbar.classList.add('hl-active');
+        const hlBtn = document.getElementById('tool-highlight-btn');
+        if (hlBtn) hlBtn.textContent = '✏️ Tắt Highlight';
+      }
+    };
+    palette.appendChild(btn);
+  });
+}
 
 function handleHighlight(e) {
   if (!highlightModeActive) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.toString().trim() === '') return;
   const range = sel.getRangeAt(0);
-  const container = document.getElementById('quiz-passage-content');
-  if (!container || !container.contains(range.commonAncestorContainer)) return;
 
-  const color = HIGHLIGHT_COLORS[highlightColorIdx % HIGHLIGHT_COLORS.length];
-  highlightColorIdx++;
+  // Allow highlight in both passage and question panels
+  const passage = document.getElementById('quiz-passage-content');
+  const questions = document.getElementById('quiz-question-area');
+  const inPassage = passage && passage.contains(range.commonAncestorContainer);
+  const inQuestion = questions && questions.contains(range.commonAncestorContainer);
+  if (!inPassage && !inQuestion) return;
+
+  const color = selectedHighlightColor;
 
   const mark = document.createElement('mark');
   mark.style.cssText = 'background:' + color + ';border-radius:3px;padding:1px 0;cursor:pointer';
   mark.title = 'Bấm để xoá highlight';
-  mark.onclick = function() { 
+  mark.onclick = function() {
     const parent = this.parentNode;
     while(this.firstChild) parent.insertBefore(this.firstChild, this);
     parent.removeChild(this);
@@ -4946,14 +5026,16 @@ function handleHighlight(e) {
 }
 
 function clearHighlights() {
-  const container = document.getElementById('quiz-passage-content');
-  if (!container) return;
-  container.querySelectorAll('mark').forEach(mark => {
-    const parent = mark.parentNode;
-    while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-    parent.removeChild(mark);
+  ['quiz-passage-content', 'quiz-question-area'].forEach(id => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    container.querySelectorAll('mark').forEach(mark => {
+      const parent = mark.parentNode;
+      while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+    });
+    container.normalize();
   });
-  container.normalize();
 }
 
 function formatDate(ts) {
