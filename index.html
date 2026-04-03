@@ -1285,6 +1285,7 @@ main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
 
 /* Highlight mode */
 #quiz-passage-content.highlight-mode { cursor: crosshair; }
+#quiz-question-area.highlight-mode { cursor: crosshair; }
 
 /* Highlight color picker */
 .hl-swatch {
@@ -2061,7 +2062,7 @@ function goToSplash() {
 
         <!-- RIGHT: questions -->
         <div style="display:flex;flex-direction:column;overflow:hidden;background:var(--white)">
-          <div style="flex:1;overflow-y:auto" id="quiz-question-area"></div>
+          <div style="flex:1;overflow-y:auto;user-select:text" id="quiz-question-area" onmouseup="handleHighlight(event)"></div>
           <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
             <div style="font-size:0.82rem;color:var(--muted)" id="quiz-progress-text">Câu 1/10</div>
             <div style="display:flex;gap:0.5rem">
@@ -2133,7 +2134,7 @@ function goToSplash() {
 
         <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
           <button class="btn-secondary" onclick="showPage('exams')">Xem đề khác</button>
-          <button class="btn-secondary" id="btn-show-review" onclick="showReview()" style="border-color:var(--green);color:var(--green)">📋 Xem lại đáp án</button>
+          <button class="btn-secondary" onclick="showReview()" style="border-color:var(--green);color:var(--green)">📋 Xem lại đáp án</button>
           <button class="btn-main" style="width:auto;padding:10px 24px" onclick="showPage('dashboard')">Về trang chủ</button>
         </div>
       </div>
@@ -2424,8 +2425,8 @@ function goToSplash() {
 
         <!-- Exam info -->
         <div class="panel-card" style="margin-bottom:0.75rem">
-          <h3 id="exam-form-heading">Thông tin đề thi</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 120px;gap:0.75rem;align-items:end;margin-bottom:0.75rem">
+          <h3>Thông tin đề thi</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 120px;gap:0.75rem;align-items:end">
             <div>
               <label class="form-label">Tiêu đề</label>
               <input type="text" class="form-input" id="t-exam-title" placeholder="VD: Orange 20 Reading Test 1">
@@ -2445,27 +2446,6 @@ function goToSplash() {
               <label class="form-label">Thời gian (phút)</label>
               <input type="number" class="form-input" id="t-exam-time" value="60">
             </div>
-          </div>
-
-          <!-- Password + Review settings row -->
-          <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;gap:0.75rem 1.25rem;align-items:center;padding:0.875rem 1rem;background:var(--cream);border-radius:var(--r-sm);border:1px solid var(--border)">
-            <!-- Password toggle -->
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;white-space:nowrap">
-              <input type="checkbox" id="t-exam-has-password" onchange="toggleExamPasswordInput()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
-              <span style="font-size:0.85rem;font-weight:600;color:var(--ink2)">🔒 Đặt mật khẩu</span>
-            </label>
-            <div>
-              <input type="text" class="form-input" id="t-exam-password" maxlength="6" pattern="\d{6}" placeholder="6 chữ số (VD: 123456)"
-                style="display:none;letter-spacing:4px;font-size:1rem;font-weight:700;text-align:center"
-                oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)">
-              <span id="t-exam-password-hint" style="font-size:0.78rem;color:var(--muted)">Học sinh không cần nhập mật khẩu</span>
-            </div>
-            <!-- Allow review toggle -->
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;white-space:nowrap">
-              <input type="checkbox" id="t-exam-allow-review" checked style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
-              <span style="font-size:0.85rem;font-weight:600;color:var(--ink2)">📋 Cho xem lại đáp án</span>
-            </label>
-            <span style="font-size:0.78rem;color:var(--muted)" id="t-exam-review-hint">Học sinh có thể xem đáp án sau khi nộp</span>
           </div>
         </div>
 
@@ -2587,6 +2567,7 @@ function goToSplash() {
         <!-- Sub-tabs -->
         <div style="display:flex;gap:4px;margin-bottom:1.25rem;border-bottom:1px solid var(--border)">
           <button class="teacher-tab active" id="wtab-create" onclick="switchWritingTab('create')" style="margin-bottom:-1px">➕ Giao đề Writing</button>
+          <button class="teacher-tab" id="wtab-manage" onclick="switchWritingTab('manage')" style="margin-bottom:-1px">📋 Quản lý đề</button>
           <button class="teacher-tab" id="wtab-subs" onclick="switchWritingTab('subs')" style="margin-bottom:-1px">📬 Bài nộp Writing</button>
         </div>
 
@@ -2624,6 +2605,15 @@ function goToSplash() {
           </div>
         </div>
 
+        <!-- MANAGE WRITING TASKS -->
+        <div id="wt-manage" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem">
+            <div style="font-family:Fraunces,serif;font-size:1.1rem;font-weight:400">Danh sách đề Writing đã giao</div>
+            <button onclick="loadManageWritingTasks()" style="padding:6px 14px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.82rem;color:var(--muted)">🔄 Làm mới</button>
+          </div>
+          <div id="wt-manage-list"><div class="loading-spinner">Đang tải...</div></div>
+        </div>
+
         <!-- WRITING SUBMISSIONS LIST -->
         <div id="wt-subs" style="display:none">
           <div style="margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem">
@@ -2633,6 +2623,48 @@ function goToSplash() {
             </select>
           </div>
           <div id="writing-submissions-list"><div class="loading-spinner">Đang tải...</div></div>
+        </div>
+
+        <!-- EDIT WRITING TASK MODAL -->
+        <div id="wt-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:600;display:none;align-items:center;justify-content:center;padding:1rem">
+          <div style="background:var(--white);border-radius:var(--r);max-width:600px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:fadeUp 0.2s ease">
+            <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--cream)">
+              <div style="font-family:Fraunces,serif;font-size:1.15rem;font-weight:400">✏️ Chỉnh sửa đề Writing</div>
+              <button onclick="closeEditWritingModal()" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:var(--muted)">✕</button>
+            </div>
+            <div style="padding:1.5rem">
+              <input type="hidden" id="wt-edit-id">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+                <div>
+                  <label class="form-label">Tiêu đề</label>
+                  <input type="text" class="form-input" id="wt-edit-title">
+                </div>
+                <div>
+                  <label class="form-label">Loại Task</label>
+                  <select class="form-select" id="wt-edit-type">
+                    <option value="task1">Task 1 (≥150 từ)</option>
+                    <option value="task2">Task 2 (≥250 từ)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Thời gian (phút)</label>
+                  <input type="number" class="form-input" id="wt-edit-time" min="10" max="120">
+                </div>
+              </div>
+              <div style="margin-bottom:0.75rem">
+                <label class="form-label">Nội dung đề bài</label>
+                <textarea class="form-input" id="wt-edit-prompt" rows="7" style="resize:vertical;font-size:0.875rem;line-height:1.7"></textarea>
+              </div>
+              <div style="margin-bottom:1.25rem">
+                <label class="form-label">Link ảnh biểu đồ (nếu có)</label>
+                <input type="text" class="form-input" id="wt-edit-img" placeholder="https://...">
+              </div>
+              <div style="display:flex;gap:0.75rem;justify-content:flex-end">
+                <button onclick="closeEditWritingModal()" style="padding:10px 20px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.9rem;color:var(--muted)">Huỷ</button>
+                <button onclick="saveWritingTaskEdit()" style="padding:10px 22px;background:var(--green);color:white;border:none;border-radius:var(--r-sm);cursor:pointer;font-family:inherit;font-size:0.9rem;font-weight:600">💾 Lưu thay đổi</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- AI GRADING MODAL (overlay) -->
@@ -3046,8 +3078,6 @@ function createExamCard(id, exam) {
   div.className = 'exam-card';
   div.onclick = () => startExam(id, exam);
   const qCount = exam.questions ? Object.keys(exam.questions).length : 0;
-  const lockBadge = exam.password ? '<span class="pill" style="background:#fef3c7;color:#92400e">🔒 Có mật khẩu</span>' : '';
-  const reviewBadge = exam.allowReview === false ? '<span class="pill" style="background:#fef2f2;color:#dc2626">🚫 Không xem đáp án</span>' : '';
   div.innerHTML = `
     <div class="exam-week">${exam.week || ''}</div>
     <div class="exam-title">${exam.title}</div>
@@ -3056,11 +3086,7 @@ function createExamCard(id, exam) {
       ${exam.timeLimit ? '<span>⏱ ' + exam.timeLimit + ' phút</span>' : ''}
     </div>
     <div class="exam-footer">
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span class="pill ${exam.track === 'ielts' ? 'pill-ielts-tag' : 'pill-new'}">${exam.track === 'ielts' ? 'IELTS' : 'THPT'}</span>
-        ${lockBadge}
-        ${reviewBadge}
-      </div>
+      <span class="pill ${exam.track === 'ielts' ? 'pill-ielts-tag' : 'pill-new'}">${exam.track === 'ielts' ? 'IELTS' : 'THPT'}</span>
       <span style="font-size:0.8rem;color:var(--muted)">${formatDate(exam.createdAt)}</span>
     </div>
   `;
@@ -3073,87 +3099,7 @@ function createExamCard(id, exam) {
 let highlightModeActive = false;
 
 function startExam(id, exam) {
-  if (exam.password) {
-    showPasswordDialog(exam.password, function() {
-      _showTimeLimitDialog(id, exam);
-    });
-  } else {
-    _showTimeLimitDialog(id, exam);
-  }
-}
-
-function showPasswordDialog(correctPassword, onSuccess) {
-  const old = document.getElementById('password-dialog');
-  if (old) old.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'password-dialog';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:1rem';
-
-  overlay.innerHTML = `
-    <div style="background:var(--white);border-radius:var(--r);padding:2rem;max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:fadeUp 0.2s ease;text-align:center">
-      <div style="font-size:2.5rem;margin-bottom:0.75rem">🔒</div>
-      <div style="font-family:Fraunces,serif;font-size:1.3rem;font-weight:400;margin-bottom:0.5rem">Đề thi có mật khẩu</div>
-      <div style="font-size:0.85rem;color:var(--muted);margin-bottom:1.5rem">Nhập mã 6 số do giáo viên cung cấp để vào làm bài</div>
-      <div style="display:flex;gap:0.75rem;justify-content:center;margin-bottom:1rem" id="pwd-digits">
-        ${[0,1,2,3,4,5].map(i => `<input type="text" inputmode="numeric" maxlength="1"
-          id="pwd-d${i}" data-idx="${i}"
-          style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;font-family:Fraunces,serif;border:2px solid var(--border);border-radius:var(--r-sm);outline:none;background:var(--cream);color:var(--ink);transition:border-color 0.15s"
-          oninput="pwdDigitInput(this,${i})" onkeydown="pwdDigitBack(event,${i})"
-          onfocus="this.style.borderColor='var(--green)';this.select()"
-          onblur="this.style.borderColor='var(--border)'">`).join('')}
-      </div>
-      <div id="pwd-error" style="display:none;color:var(--red);font-size:0.85rem;margin-bottom:0.75rem;animation:fadeUp 0.15s ease">❌ Mật khẩu không đúng, thử lại!</div>
-      <div style="display:flex;gap:0.75rem">
-        <button onclick="document.getElementById('password-dialog').remove()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.9rem;color:var(--muted)">Huỷ</button>
-        <button id="pwd-submit-btn" onclick="submitPasswordDialog('${correctPassword}')" style="flex:2;padding:10px;background:var(--green);color:white;border:none;border-radius:var(--r-sm);cursor:pointer;font-family:inherit;font-size:0.95rem;font-weight:600">Xác nhận →</button>
-      </div>
-    </div>`;
-
-  document.body.appendChild(overlay);
-  document.getElementById('pwd-d0').focus();
-
-  // Store success callback
-  overlay._onSuccess = onSuccess;
-}
-
-function pwdDigitInput(input, idx) {
-  input.value = input.value.replace(/\D/g, '').slice(-1);
-  if (input.value && idx < 5) {
-    document.getElementById('pwd-d' + (idx + 1)).focus();
-  }
-  document.getElementById('pwd-error').style.display = 'none';
-}
-
-function pwdDigitBack(e, idx) {
-  if (e.key === 'Backspace' && !e.target.value && idx > 0) {
-    document.getElementById('pwd-d' + (idx - 1)).focus();
-  }
-  if (e.key === 'Enter') document.getElementById('pwd-submit-btn').click();
-}
-
-function submitPasswordDialog(correct) {
-  const entered = [0,1,2,3,4,5].map(i => document.getElementById('pwd-d' + i).value).join('');
-  if (entered === correct) {
-    const overlay = document.getElementById('password-dialog');
-    const cb = overlay._onSuccess;
-    overlay.remove();
-    if (cb) cb();
-  } else {
-    const errEl = document.getElementById('pwd-error');
-    errEl.style.display = 'block';
-    // Shake animation
-    [0,1,2,3,4,5].forEach(i => {
-      const d = document.getElementById('pwd-d' + i);
-      d.value = '';
-      d.style.borderColor = 'var(--red)';
-      setTimeout(() => d.style.borderColor = 'var(--border)', 600);
-    });
-    document.getElementById('pwd-d0').focus();
-  }
-}
-
-function _showTimeLimitDialog(id, exam) {
+  // Show time customization dialog before starting
   const defaultTime = exam.timeLimit || (exam.track === 'ielts' ? 60 : 0);
   showTimeLimitDialog(defaultTime, exam.track, function(chosenMinutes) {
     const examWithTime = { ...exam, timeLimit: chosenMinutes };
@@ -3308,16 +3254,19 @@ function updateNavDots() {
 function toggleHighlightMode() {
   highlightModeActive = !highlightModeActive;
   const btn = document.getElementById('tool-highlight-btn');
-  const contentEl = document.getElementById('quiz-passage-content');
+  const passageEl = document.getElementById('quiz-passage-content');
+  const questionEl = document.getElementById('quiz-question-area');
   const toolbar = document.getElementById('highlight-toolbar');
   if (highlightModeActive) {
     if (toolbar) toolbar.classList.add('hl-active');
     if (btn) btn.textContent = '✏️ Tắt Highlight';
-    if (contentEl) contentEl.classList.add('highlight-mode');
+    if (passageEl) passageEl.classList.add('highlight-mode');
+    if (questionEl) questionEl.classList.add('highlight-mode');
   } else {
     if (toolbar) toolbar.classList.remove('hl-active');
     if (btn) btn.textContent = '✏️ Highlight';
-    if (contentEl) contentEl.classList.remove('highlight-mode');
+    if (passageEl) passageEl.classList.remove('highlight-mode');
+    if (questionEl) questionEl.classList.remove('highlight-mode');
   }
 }
 
@@ -3481,27 +3430,6 @@ async function submitExam() {
   } else {
     document.getElementById('res-band').textContent = (correct * 10 / total).toFixed(1);
     document.getElementById('res-band-label').textContent = 'Điểm /10';
-  }
-
-  // Show/hide review button based on allowReview setting
-  const reviewBtn = document.getElementById('btn-show-review');
-  if (reviewBtn) {
-    if (currentExam.allowReview === false) {
-      reviewBtn.style.display = 'none';
-      // Show a note that review is not allowed
-      const noReviewNote = document.getElementById('no-review-note');
-      if (!noReviewNote) {
-        const note = document.createElement('div');
-        note.id = 'no-review-note';
-        note.style.cssText = 'padding:8px 16px;background:var(--red-light);border:1px solid #fca5a5;border-radius:var(--r-sm);font-size:0.82rem;color:var(--red);display:inline-flex;align-items:center;gap:6px';
-        note.innerHTML = '🚫 Giáo viên không cho xem lại đáp án cho đề này';
-        reviewBtn.parentNode.insertBefore(note, reviewBtn);
-      }
-    } else {
-      reviewBtn.style.display = '';
-      const noReviewNote = document.getElementById('no-review-note');
-      if (noReviewNote) noReviewNote.remove();
-    }
   }
 
   showPage('result');
@@ -4172,35 +4100,12 @@ function updateManualQCount() {
   if (el) el.textContent = n + ' câu hỏi';
 }
 
-function toggleExamPasswordInput() {
-  const cb = document.getElementById('t-exam-has-password');
-  const input = document.getElementById('t-exam-password');
-  const hint = document.getElementById('t-exam-password-hint');
-  if (cb.checked) {
-    input.style.display = '';
-    hint.style.display = 'none';
-    input.focus();
-  } else {
-    input.style.display = 'none';
-    input.value = '';
-    hint.style.display = '';
-  }
-}
-
 async function publishManualExam() {
   const title = document.getElementById('t-exam-title').value.trim();
   const track = document.getElementById('t-exam-track').value;
   const week = document.getElementById('t-exam-week').value.trim();
   const timeLimit = parseInt(document.getElementById('t-exam-time').value) || 60;
   if (!title) return showToast('Vui lòng nhập tiêu đề đề thi!');
-
-  // Password
-  const hasPassword = document.getElementById('t-exam-has-password').checked;
-  const password = document.getElementById('t-exam-password').value.trim();
-  if (hasPassword && password.length !== 6) return showToast('Mật khẩu phải đúng 6 chữ số!');
-
-  // Allow review
-  const allowReview = document.getElementById('t-exam-allow-review').checked;
 
   const passage1 = document.getElementById('t-passage-1')?.value.trim() || null;
   const passage2 = document.getElementById('t-passage-2')?.value.trim() || null;
@@ -4249,8 +4154,6 @@ async function publishManualExam() {
     passage2: passage2 || null,
     passage3: passage3 || null,
     timeLimit,
-    password: hasPassword ? password : null,
-    allowReview: allowReview,
     questions
   };
 
@@ -4277,13 +4180,6 @@ function resetExamForm() {
   document.getElementById('t-exam-week').value = '';
   document.getElementById('t-exam-time').value = '60';
   document.getElementById('t-exam-track').value = 'thpt';
-  // Reset password fields
-  document.getElementById('t-exam-has-password').checked = false;
-  document.getElementById('t-exam-password').value = '';
-  document.getElementById('t-exam-password').style.display = 'none';
-  document.getElementById('t-exam-password-hint').style.display = '';
-  // Reset allow review
-  document.getElementById('t-exam-allow-review').checked = true;
   document.getElementById('t-passage-1').value = '';
   document.getElementById('t-passage-2').value = '';
   document.getElementById('t-passage-3').value = '';
@@ -4377,8 +4273,6 @@ function renderTeacherExamList() {
         <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:4px;flex-wrap:wrap">
           ${trackBadge}
           ${exam.week ? '<span style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + exam.week + '</span>' : ''}
-          ${exam.password ? '<span style="padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:#fef3c7;color:#92400e">🔒 Mật khẩu</span>' : ''}
-          ${exam.allowReview === false ? '<span style="padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;background:var(--red-light);color:var(--red)">🚫 Ẩn đáp án</span>' : ''}
         </div>
         <div style="font-family:Fraunces,serif;font-size:1rem;font-weight:400;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${exam.title}</div>
         <div style="font-size:0.75rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap">
@@ -4412,15 +4306,6 @@ async function editExam(examId) {
   document.getElementById('t-exam-track').value = exam.track || 'thpt';
   document.getElementById('t-exam-week').value = exam.week || '';
   document.getElementById('t-exam-time').value = exam.timeLimit || 60;
-
-  // Fill password fields
-  const hasPwd = !!exam.password;
-  document.getElementById('t-exam-has-password').checked = hasPwd;
-  document.getElementById('t-exam-password').value = exam.password || '';
-  document.getElementById('t-exam-password').style.display = hasPwd ? '' : 'none';
-  document.getElementById('t-exam-password-hint').style.display = hasPwd ? 'none' : '';
-  // Fill allow review
-  document.getElementById('t-exam-allow-review').checked = exam.allowReview !== false;
 
   // Fill passages
   document.getElementById('t-passage-1').value = exam.passage || '';
@@ -5150,8 +5035,10 @@ function initHighlightPalette() {
       // Auto-enable highlight mode when picking a color
       if (!highlightModeActive) {
         highlightModeActive = true;
-        const contentEl = document.getElementById('quiz-passage-content');
-        if (contentEl) contentEl.classList.add('highlight-mode');
+        const passageEl = document.getElementById('quiz-passage-content');
+        const questionEl = document.getElementById('quiz-question-area');
+        if (passageEl) passageEl.classList.add('highlight-mode');
+        if (questionEl) questionEl.classList.add('highlight-mode');
         const toolbar = document.getElementById('highlight-toolbar');
         if (toolbar) toolbar.classList.add('hl-active');
         const hlBtn = document.getElementById('tool-highlight-btn');
@@ -5167,15 +5054,20 @@ function handleHighlight(e) {
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.toString().trim() === '') return;
   const range = sel.getRangeAt(0);
-  const container = document.getElementById('quiz-passage-content');
-  if (!container || !container.contains(range.commonAncestorContainer)) return;
+
+  // Allow highlight in both passage and question panels
+  const passage = document.getElementById('quiz-passage-content');
+  const questions = document.getElementById('quiz-question-area');
+  const inPassage = passage && passage.contains(range.commonAncestorContainer);
+  const inQuestion = questions && questions.contains(range.commonAncestorContainer);
+  if (!inPassage && !inQuestion) return;
 
   const color = selectedHighlightColor;
 
   const mark = document.createElement('mark');
   mark.style.cssText = 'background:' + color + ';border-radius:3px;padding:1px 0;cursor:pointer';
   mark.title = 'Bấm để xoá highlight';
-  mark.onclick = function() { 
+  mark.onclick = function() {
     const parent = this.parentNode;
     while(this.firstChild) parent.insertBefore(this.firstChild, this);
     parent.removeChild(this);
@@ -5186,14 +5078,16 @@ function handleHighlight(e) {
 }
 
 function clearHighlights() {
-  const container = document.getElementById('quiz-passage-content');
-  if (!container) return;
-  container.querySelectorAll('mark').forEach(mark => {
-    const parent = mark.parentNode;
-    while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-    parent.removeChild(mark);
+  ['quiz-passage-content', 'quiz-question-area'].forEach(id => {
+    const container = document.getElementById(id);
+    if (!container) return;
+    container.querySelectorAll('mark').forEach(mark => {
+      const parent = mark.parentNode;
+      while(mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+    });
+    container.normalize();
   });
-  container.normalize();
 }
 
 function formatDate(ts) {
@@ -5365,10 +5259,13 @@ async function submitWriting() {
 // ── TEACHER: Writing tab switch ──
 function switchWritingTab(tab) {
   document.getElementById('wt-create').style.display = tab === 'create' ? '' : 'none';
+  document.getElementById('wt-manage').style.display = tab === 'manage' ? '' : 'none';
   document.getElementById('wt-subs').style.display = tab === 'subs' ? '' : 'none';
   document.getElementById('wtab-create').classList.toggle('active', tab === 'create');
+  document.getElementById('wtab-manage').classList.toggle('active', tab === 'manage');
   document.getElementById('wtab-subs').classList.toggle('active', tab === 'subs');
   if (tab === 'subs') loadWritingSubmissions();
+  if (tab === 'manage') loadManageWritingTasks();
 }
 
 async function publishWritingTask() {
@@ -5384,6 +5281,113 @@ async function publishWritingTask() {
   document.getElementById('wt-title').value = '';
   document.getElementById('wt-prompt').value = '';
   document.getElementById('wt-img').value = '';
+}
+
+// ── TEACHER: Manage (list, edit, delete) writing tasks ──
+async function loadManageWritingTasks() {
+  const container = document.getElementById('wt-manage-list');
+  if (!container) return;
+  container.innerHTML = '<div class="loading-spinner">Đang tải...</div>';
+  const snap = await db.ref('writingTasks').get();
+  container.innerHTML = '';
+  if (!snap.exists()) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✍️</div><h3>Chưa có đề nào</h3><p>Hãy tạo đề ở tab "Giao đề Writing".</p></div>';
+    return;
+  }
+  const tasks = Object.entries(snap.val()).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+  tasks.forEach(([id, task]) => {
+    const div = document.createElement('div');
+    div.className = 'writing-sub-item';
+    div.style.marginBottom = '0.625rem';
+    const taskType = task.type === 'task2' ? 'Task 2' : 'Task 1';
+    const badgeClass = task.type === 'task2' ? 'badge-task2' : 'badge-task1';
+    const dateStr = task.createdAt ? new Date(task.createdAt).toLocaleDateString('vi-VN') : '';
+    div.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;flex-wrap:wrap">
+            <span class="writing-task-badge ${badgeClass}">${taskType}</span>
+            <span style="font-size:0.72rem;color:var(--muted)">${dateStr}${task.time ? ' · ⏱ ' + task.time + ' phút' : ''}</span>
+          </div>
+          <div style="font-weight:600;font-size:0.95rem;margin-bottom:0.25rem">${task.title}</div>
+          <div style="font-size:0.82rem;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${task.prompt || ''}</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-shrink:0;align-items:center">
+          <button onclick="openEditWritingModal('${id}')"
+            style="padding:7px 16px;border:1.5px solid var(--green);border-radius:var(--r-sm);background:var(--green-light);color:var(--green);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.15s"
+            onmouseenter="this.style.background='var(--green)';this.style.color='white'"
+            onmouseleave="this.style.background='var(--green-light)';this.style.color='var(--green)'">✏️ Sửa</button>
+          <button onclick="confirmDeleteWritingTask('${id}', '${task.title.replace(/'/g,"\\'")}' )"
+            style="padding:7px 16px;border:1.5px solid var(--red);border-radius:var(--r-sm);background:var(--red-light);color:var(--red);cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.15s"
+            onmouseenter="this.style.background='var(--red)';this.style.color='white'"
+            onmouseleave="this.style.background='var(--red-light)';this.style.color='var(--red)'">🗑 Xoá</button>
+        </div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+async function openEditWritingModal(taskId) {
+  const snap = await db.ref('writingTasks/' + taskId).get();
+  if (!snap.exists()) return showToast('Không tìm thấy đề!');
+  const task = snap.val();
+  document.getElementById('wt-edit-id').value = taskId;
+  document.getElementById('wt-edit-title').value = task.title || '';
+  document.getElementById('wt-edit-type').value = task.type || 'task1';
+  document.getElementById('wt-edit-time').value = task.time || 40;
+  document.getElementById('wt-edit-prompt').value = task.prompt || '';
+  document.getElementById('wt-edit-img').value = task.imgUrl || '';
+  const modal = document.getElementById('wt-edit-modal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditWritingModal() {
+  document.getElementById('wt-edit-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function saveWritingTaskEdit() {
+  const id = document.getElementById('wt-edit-id').value;
+  const title = document.getElementById('wt-edit-title').value.trim();
+  const type = document.getElementById('wt-edit-type').value;
+  const time = parseInt(document.getElementById('wt-edit-time').value) || 40;
+  const prompt = document.getElementById('wt-edit-prompt').value.trim();
+  const imgUrl = document.getElementById('wt-edit-img').value.trim();
+  if (!title) return showToast('Vui lòng nhập tiêu đề!');
+  if (!prompt) return showToast('Vui lòng nhập đề bài!');
+  await db.ref('writingTasks/' + id).update({ title, type, time, prompt, imgUrl: imgUrl || null });
+  showToast('✅ Đã lưu thay đổi!');
+  closeEditWritingModal();
+  loadManageWritingTasks();
+}
+
+function confirmDeleteWritingTask(taskId, taskTitle) {
+  // Simple confirm dialog overlay
+  const old = document.getElementById('wt-delete-confirm');
+  if (old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'wt-delete-confirm';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:1rem';
+  overlay.innerHTML = `
+    <div style="background:var(--white);border-radius:var(--r);max-width:420px;width:100%;padding:2rem;box-shadow:0 8px 40px rgba(0,0,0,0.2);animation:fadeUp 0.2s ease;text-align:center">
+      <div style="font-size:2.5rem;margin-bottom:0.75rem">🗑</div>
+      <div style="font-family:Fraunces,serif;font-size:1.2rem;font-weight:400;margin-bottom:0.5rem">Xoá đề Writing?</div>
+      <div style="font-size:0.875rem;color:var(--muted);margin-bottom:1.5rem">Đề "<strong>${taskTitle}</strong>" sẽ bị xoá vĩnh viễn. Hành động này không thể hoàn tác.</div>
+      <div style="display:flex;gap:0.75rem;justify-content:center">
+        <button onclick="document.getElementById('wt-delete-confirm').remove()" style="flex:1;max-width:140px;padding:10px;border:1px solid var(--border);border-radius:var(--r-sm);background:none;cursor:pointer;font-family:inherit;font-size:0.9rem;color:var(--muted)">Huỷ</button>
+        <button onclick="deleteWritingTask('${taskId}')" style="flex:1;max-width:140px;padding:10px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);cursor:pointer;font-family:inherit;font-size:0.9rem;font-weight:600">Xoá</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function deleteWritingTask(taskId) {
+  const confirm = document.getElementById('wt-delete-confirm');
+  if (confirm) confirm.remove();
+  await db.ref('writingTasks/' + taskId).remove();
+  showToast('🗑 Đã xoá đề Writing!');
+  loadManageWritingTasks();
 }
 
 async function loadWritingSubmissions() {
