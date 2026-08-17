@@ -2112,6 +2112,8 @@ function goToSplash() {
         </div>
         <div class="result-title" id="result-heading">Xuất sắc! 🎉</div>
         <div class="result-sub" id="res-sub">Bạn đã trả lời đúng 8/10 câu</div>
+        <div id="res-save-status" style="display:none;background:#FFF4E5;border:1px solid var(--amber);color:#8a5a00;border-radius:8px;padding:10px 14px;font-size:0.85rem;margin:0.75rem 0;text-align:center"></div>
+        <div id="res-incomplete-note" style="display:none;background:#FDECEC;border:1px solid var(--red);color:#8a1f1f;border-radius:8px;padding:10px 14px;font-size:0.85rem;margin:0.75rem 0;text-align:center">⚠️ Bài chưa hoàn thành 100% (hết giờ hoặc bỏ trống câu hỏi) nên lần này không được tính vào streak. Điểm số vẫn được lưu bình thường.</div>
         <div class="result-breakdown">
           <div class="breakdown-item">
             <div class="breakdown-num" id="res-correct" style="color:var(--green)">8</div>
@@ -2425,6 +2427,7 @@ function goToSplash() {
         <button class="teacher-tab" onclick="switchTeacherTab('classes')">🏫 Quản lý lớp</button>
         <button class="teacher-tab" onclick="switchTeacherTab('results')">📊 Kết quả</button>
         <button class="teacher-tab" onclick="switchTeacherTab('students')">👥 Học sinh</button>
+        <button class="teacher-tab" onclick="switchTeacherTab('streak')">🔥 Chuỗi</button>
         <button class="teacher-tab" onclick="switchTeacherTab('submissions')">📬 Bài nộp</button>
       </div>
 
@@ -2590,6 +2593,20 @@ function goToSplash() {
           <div id="student-list" class="student-list">
             <div class="loading-spinner">Đang tải...</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Streak tracking -->
+      <div id="teacher-streak" class="teacher-section">
+        <div class="panel-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.75rem">
+            <h3 style="margin:0">🔥 Theo dõi chuỗi (streak)</h3>
+            <input type="text" class="form-input" id="streak-search" oninput="renderStreakTable()" placeholder="Tìm học sinh..." style="width:auto;min-width:200px">
+          </div>
+          <p style="font-size:0.82rem;color:var(--muted);margin:-0.5rem 0 1rem">
+            🔥 = streak hiện tại. ➕ / ➖ để cộng/trừ trực tiếp số streak của học sinh. <strong>Khôi phục</strong> đưa streak về mức cao nhất học sinh từng đạt (nếu bị mất do lỗi).
+          </p>
+          <div id="teacher-streak-list"><div class="loading-spinner">Đang tải...</div></div>
         </div>
       </div>
 
@@ -2812,6 +2829,8 @@ let quizStartTime = null;
 let quizTimeTaken = 0; // seconds
 let writingStartTime = null; // for writing time tracking
 let currentPinnedMsgKey = null;
+let isSubmittingExam = false; // guards against duplicate submit (double-click / timer race)
+let lastFailedSubmission = null; // { examId, payload } — set when a save fails, used by retryLastSubmission()
 
 // ═══════════════════════════════
 // SPLASH
@@ -3019,27 +3038,198 @@ function showPage(name) {
 }
 
 // ═══════════════════════════════
+// STREAK ENGINE
+// Submission history (`results/{uid}`) is the ONLY source of truth for
+// streak. There is deliberately no separate stored "currentStreak" field
+// anywhere in the database — streak is always recalculated live from real
+// submissions, so it can never silently drift out of sync or get
+// overwritten independently of the data that produced it.
+// ═══════════════════════════════
+const STREAK_TZ = 'Asia/Ho_Chi_Minh';
+
+// Start-of-day timestamp (ms, as a UTC instant) for a given time, computed
+// using the Vietnam calendar day (UTC+7) — not the device's local timezone.
+function vnDayStart(ts) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: STREAK_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date(ts));
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  return Date.parse(y + '-' + m + '-' + d + 'T00:00:00+07:00');
+}
+
+// Flattens a `results/{uid}` node into a flat array of attempts.
+// Supports BOTH schemas so old data is never touched or discarded:
+//  - legacy:  results/{uid}/{examId}                = one result object
+//  - current: results/{uid}/{examId}/{attemptId}    = one result object
+// (we moved to per-attempt records so retaking an exam can never overwrite
+// and silently delete an earlier submission — see submitExam()/saveExamResult())
+function flattenUserResults(userResultsNode) {
+  const attempts = [];
+  if (!userResultsNode) return attempts;
+  Object.entries(userResultsNode).forEach(([examId, node]) => {
+    if (!node || typeof node !== 'object') return;
+    if ('correct' in node && 'completedAt' in node) {
+      attempts.push({ examId, attemptId: examId, ...node }); // legacy flat record
+    } else {
+      Object.entries(node).forEach(([attemptId, r]) => {
+        if (r && typeof r === 'object') attempts.push({ examId, attemptId, ...r });
+      });
+    }
+  });
+  return attempts;
+}
+
+// A submission counts toward streak only if it was a real, fully completed,
+// confirmed submission. Score is explicitly NEVER part of this check.
+function isStreakEligibleAttempt(attempt) {
+  if (!attempt || typeof attempt.completedAt !== 'number' || attempt.completedAt <= 0) return false;
+  if (attempt.submitted === true && attempt.completion === 100) return true;
+  // Legacy records predate the submitted/completion fields — treat any
+  // pre-existing valid record as eligible so nobody's real history is
+  // thrown away by the new, stricter rule.
+  if (attempt.submitted === undefined && attempt.completion === undefined
+      && typeof attempt.correct === 'number' && typeof attempt.total === 'number') return true;
+  return false;
+}
+
+// Recalculates current streak + last submission time straight from
+// submission history. Called fresh every time — nothing is cached.
+function calculateStreakFromResults(userResultsNode) {
+  const attempts = flattenUserResults(userResultsNode).filter(isStreakEligibleAttempt);
+  if (!attempts.length) return { streak: 0, lastSubmission: null };
+  const days = new Set(attempts.map(a => vnDayStart(a.completedAt)));
+  const lastSubmission = Math.max(...attempts.map(a => a.completedAt));
+  const todayStart = vnDayStart(Date.now());
+  let check = todayStart;
+  // If today has no submission yet, the streak isn't broken until the VN
+  // day fully passes with nothing logged — so check from yesterday instead
+  // of zeroing it out the instant midnight hits.
+  if (!days.has(check)) check -= 86400000;
+  let streak = 0;
+  while (days.has(check)) { streak++; check -= 86400000; }
+  return { streak, lastSubmission };
+}
+
+// Longest run of consecutive VN-calendar days with an eligible submission,
+// ANYWHERE in a student's full history — not just the run ending today.
+// This is what the teacher's "Khôi phục" (restore) button restores to.
+function calculateHistoricalMaxStreak(userResultsNode) {
+  const attempts = flattenUserResults(userResultsNode).filter(isStreakEligibleAttempt);
+  if (!attempts.length) return 0;
+  const days = Array.from(new Set(attempts.map(a => vnDayStart(a.completedAt)))).sort((a,b) => a-b);
+  let best = 1, run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = (days[i] - days[i-1] === 86400000) ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+// A "streak override" is a manual teacher correction (see Teacher Dashboard
+// → 🔥 Chuỗi). It is stored SEPARATELY from submission history
+// (`streakOverrides/{uid}`, never touches `results/`) as a simple additive
+// adjustment: the streak shown to everyone is the live number recalculated
+// from real submissions, PLUS whatever the teacher has manually added or
+// subtracted. This lets a teacher both restore a lost streak and fine-tune
+// it by any amount, without ever editing submission history itself.
+async function getStreakOverride(uid) {
+  try {
+    const snap = await db.ref('streakOverrides/' + uid).get();
+    return snap.exists() ? snap.val() : null;
+  } catch (e) {
+    console.warn('getStreakOverride failed:', e);
+    return null;
+  }
+}
+
+function effectiveStreak(liveStreak, override) {
+  const adjust = override && typeof override.adjust === 'number' ? override.adjust : 0;
+  return Math.max(0, liveStreak + adjust);
+}
+
+// Adds (positive delta) or subtracts (negative delta) from a student's
+// manual streak adjustment. Called by the +/- buttons and by "Khôi phục".
+async function adjustStudentStreak(uid, studentName, delta) {
+  if (!delta) return;
+  try {
+    const snap = await db.ref('streakOverrides/' + uid).get();
+    const current = snap.exists() ? snap.val() : { adjust: 0 };
+    const newAdjust = (current.adjust || 0) + delta;
+    await db.ref('streakOverrides/' + uid).set({
+      adjust: newAdjust,
+      updatedAt: Date.now(),
+      updatedBy: currentUserData?.name || currentUser?.email || 'teacher'
+    });
+    showToast((delta > 0 ? '✅ Đã tăng' : '✅ Đã giảm') + ' streak của ' + studentName + ' ' + (delta > 0 ? '+' : '') + delta);
+    loadTeacherStreaks();
+  } catch (e) {
+    console.warn('adjustStudentStreak failed:', e);
+    showToast('⚠️ Không thể lưu thay đổi, kiểm tra kết nối và thử lại.');
+  }
+}
+
+function promptIncreaseStreak(uid, studentName) {
+  const raw = prompt('Tăng streak của ' + studentName + ' lên bao nhiêu?', '1');
+  if (raw === null) return;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return showToast('Vui lòng nhập một số dương.');
+  adjustStudentStreak(uid, studentName, n);
+}
+
+function promptDecreaseStreak(uid, studentName) {
+  const raw = prompt('Giảm streak của ' + studentName + ' đi bao nhiêu?', '1');
+  if (raw === null) return;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return showToast('Vui lòng nhập một số dương.');
+  adjustStudentStreak(uid, studentName, -n);
+}
+
+// "Khôi phục": bring the shown streak up to the highest the student has
+// ever historically reached, in one click.
+async function restoreStudentStreak(uid, studentName) {
+  const userResultsNode = (await db.ref('results/' + uid).get()).val();
+  const { streak: liveStreak } = calculateStreakFromResults(userResultsNode);
+  const maxEver = calculateHistoricalMaxStreak(userResultsNode);
+  const override = await getStreakOverride(uid);
+  const shownStreak = effectiveStreak(liveStreak, override);
+
+  if (maxEver <= shownStreak) {
+    showToast(studentName + ' đang ở đúng streak cao nhất rồi (🔥 ' + shownStreak + '), không cần khôi phục.');
+    return;
+  }
+  if (!confirm('Khôi phục streak của ' + studentName + ' từ 🔥 ' + shownStreak + ' lên 🔥 ' + maxEver + '?')) return;
+  await adjustStudentStreak(uid, studentName, maxEver - shownStreak);
+}
+
+async function clearStreakOverride(uid, studentName) {
+  if (!confirm('Xoá toàn bộ chỉnh sửa thủ công cho streak của ' + studentName + '? Streak sẽ trở về đúng số liệu tính từ lịch sử làm bài thật.')) return;
+  try {
+    await db.ref('streakOverrides/' + uid).remove();
+    showToast('Đã xoá chỉnh sửa thủ công cho ' + studentName);
+    loadTeacherStreaks();
+  } catch (e) {
+    showToast('⚠️ Không thể xoá, thử lại sau.');
+  }
+}
+
+// ═══════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════
 async function loadDashboard() {
   if (!currentUser) return;
   const snap = await db.ref('results/' + currentUser.uid).get();
-  let taken = 0;
-  let recentResults = [];
-  if (snap.exists()) {
-    const results = snap.val();
-    recentResults = Object.values(results).sort((a,b) => (b.completedAt||0)-(a.completedAt||0));
-    taken = recentResults.length;
-  }
+  const userResultsNode = snap.exists() ? snap.val() : null;
+  const recentResults = flattenUserResults(userResultsNode).sort((a,b) => (b.completedAt||0)-(a.completedAt||0));
+  const taken = recentResults.length;
   document.getElementById('stat-exams').textContent = taken;
 
-  // Streak: count consecutive days with activity
-  const today = new Date(); today.setHours(0,0,0,0);
-  const days = new Set(recentResults.map(r => {
-    const d = new Date(r.completedAt||0); d.setHours(0,0,0,0); return d.getTime();
-  }));
-  let streak = 0, check = today.getTime();
-  while (days.has(check)) { streak++; check -= 86400000; }
+  // Streak, recalculated live from submission history (see STREAK ENGINE above),
+  // with any teacher-restored floor applied on top (see getStreakOverride()).
+  const { streak: liveStreak } = calculateStreakFromResults(userResultsNode);
+  const override = await getStreakOverride(currentUser.uid);
+  const streak = effectiveStreak(liveStreak, override);
   document.getElementById('stat-streak').textContent = streak;
 
   // Recent results list
@@ -3505,15 +3695,31 @@ function nextQuestion() {
 }
 
 async function submitExam() {
+  // Guard against double-submit: timer expiry + button click racing, or a
+  // slow/laggy network causing an extra tap, must never create two writes.
+  if (isSubmittingExam) return;
+  isSubmittingExam = true;
+  try {
+    await submitExamInner();
+  } finally {
+    isSubmittingExam = false;
+  }
+}
+
+async function submitExamInner() {
   if (ieltTimer) clearInterval(ieltTimer);
 
   // Calculate time taken
   quizTimeTaken = quizStartTime ? Math.floor((Date.now() - quizStartTime) / 1000) : 0;
 
   let correct = 0;
+  let answeredCount = 0;
+  const total = quizQuestions.length;
   userAnswers.forEach((ans, i) => {
     const q = quizQuestions[i];
     const type = q.type || 'mcq';
+    const isAnswered = ans !== undefined && ans !== null && ans !== '';
+    if (isAnswered) answeredCount++;
     if (type === 'fill') {
       if (ans && q.correctText && ans.toLowerCase().trim() === q.correctText.toLowerCase().trim()) correct++;
     } else {
@@ -3521,18 +3727,26 @@ async function submitExam() {
     }
   });
 
-  const total = quizQuestions.length;
   const pct = Math.round(correct / total * 100);
+  // Completion is about whether every question was answered before
+  // submitting — NOT about score. A 0% score with full completion still
+  // counts as completed; a 90% score from an auto-submitted, half-answered
+  // attempt does not.
+  const completion = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
 
-  // Save result including timeTaken
+  const payload = {
+    examTitle: currentExam.title,
+    correct, total, pct,
+    track: currentExam.track,
+    completedAt: Date.now(),
+    timeTaken: quizTimeTaken,
+    completion,
+    submitted: true
+  };
+
+  let saveOk = true;
   if (currentUser) {
-    await db.ref('results/' + currentUser.uid + '/' + currentExam.id).set({
-      examTitle: currentExam.title,
-      correct, total, pct,
-      track: currentExam.track,
-      completedAt: Date.now(),
-      timeTaken: quizTimeTaken
-    });
+    saveOk = await saveExamResult(currentExam.id, payload);
   }
 
   // Show result
@@ -3563,7 +3777,73 @@ async function submitExam() {
     document.getElementById('res-band-label').textContent = 'Điểm /10';
   }
 
+  // Save-status banner: never claim the streak was kept unless the write
+  // to the database is actually confirmed successful.
+  const saveBanner = document.getElementById('res-save-status');
+  if (saveBanner) {
+    if (!currentUser) {
+      saveBanner.style.display = 'none';
+    } else if (saveOk) {
+      saveBanner.style.display = 'block';
+      saveBanner.style.background = '#EAF7EE';
+      saveBanner.style.borderColor = 'var(--green)';
+      saveBanner.style.color = '#1e5c33';
+      saveBanner.textContent = completion === 100 ? '🔥 Đã lưu bài — streak được duy trì!' : '✅ Đã lưu bài làm.';
+    } else {
+      saveBanner.style.display = 'block';
+      saveBanner.style.background = '#FDECEC';
+      saveBanner.style.borderColor = 'var(--red)';
+      saveBanner.style.color = '#8a1f1f';
+      saveBanner.innerHTML = '⚠️ Chưa lưu được bài làm do lỗi kết nối. Streak sẽ không được tính cho tới khi lưu thành công. <button onclick="retryLastSubmission()" style="margin-left:8px;padding:4px 10px;border:1px solid var(--red);background:white;color:var(--red);border-radius:6px;cursor:pointer;font-weight:600">Thử lại</button>';
+    }
+  }
+  const incompleteNote = document.getElementById('res-incomplete-note');
+  if (incompleteNote) incompleteNote.style.display = (completion === 100) ? 'none' : 'block';
+
   showPage('result');
+  if (saveOk && currentUser) loadDashboard();
+}
+
+// Persists one exam attempt as its OWN record (pushed, never overwritten),
+// so retaking an exam can never silently delete an earlier submission —
+// this was the actual cause of students' streaks/history going missing.
+// Retries once on transient failure before giving up and surfacing an
+// explicit, retryable error to the student (see res-save-status banner).
+async function saveExamResult(examId, payload, attempt = 1) {
+  try {
+    const ref = db.ref('results/' + currentUser.uid + '/' + examId).push();
+    await ref.set(payload);
+    lastFailedSubmission = null;
+    return true;
+  } catch (e) {
+    console.warn('saveExamResult failed (attempt ' + attempt + '):', e);
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1200));
+      return saveExamResult(examId, payload, attempt + 1);
+    }
+    lastFailedSubmission = { examId, payload };
+    return false;
+  }
+}
+
+async function retryLastSubmission() {
+  if (!lastFailedSubmission || !currentUser) return;
+  const { examId, payload } = lastFailedSubmission;
+  showToast('Đang thử lưu lại...');
+  const ok = await saveExamResult(examId, payload);
+  const saveBanner = document.getElementById('res-save-status');
+  if (ok) {
+    showToast('✅ Đã lưu bài làm thành công!');
+    if (saveBanner) {
+      saveBanner.style.background = '#EAF7EE';
+      saveBanner.style.borderColor = 'var(--green)';
+      saveBanner.style.color = '#1e5c33';
+      saveBanner.textContent = payload.completion === 100 ? '🔥 Đã lưu bài — streak được duy trì!' : '✅ Đã lưu bài làm.';
+    }
+    loadDashboard();
+  } else {
+    showToast('⚠️ Vẫn chưa lưu được. Kiểm tra kết nối mạng và thử lại.');
+  }
 }
 
 function calcIeltsBand(pct, total) {
@@ -4081,12 +4361,13 @@ async function searchVocab() {
 // ═══════════════════════════════
 function switchTeacherTab(tab) {
   document.querySelectorAll('.teacher-tab').forEach((t, i) => {
-    const tabs = ['upload','examlist','writing','classes','results','students','submissions'];
+    const tabs = ['upload','examlist','writing','classes','results','students','streak','submissions'];
     t.classList.toggle('active', tabs[i] === tab);
   });
   document.querySelectorAll('.teacher-section').forEach(s => s.classList.remove('active'));
   document.getElementById('teacher-' + tab).classList.add('active');
   if (tab === 'students') loadStudents();
+  if (tab === 'streak') loadTeacherStreaks();
   if (tab === 'submissions') loadSubmissions();
   if (tab === 'classes') loadTeacherClasses();
   if (tab === 'results') loadTeacherResults();
@@ -4551,11 +4832,27 @@ async function loadStudents() {
   const resultsSnap = await db.ref('results').get();
   const allResults = resultsSnap.exists() ? resultsSnap.val() : {};
 
+  const rows = [];
   snap.forEach(child => {
     const s = child.val();
     const uid = child.key;
-    const userResults = allResults[uid] ? Object.values(allResults[uid]) : [];
+    const userResultsNode = allResults[uid] || null;
+    const userResults = flattenUserResults(userResultsNode);
     const avg = userResults.length ? Math.round(userResults.reduce((a, r) => a + r.pct, 0) / userResults.length) : null;
+
+    // Streak is recalculated live from submission history — see STREAK ENGINE.
+    const { streak, lastSubmission } = calculateStreakFromResults(userResultsNode);
+    const daysSinceLast = lastSubmission ? Math.floor((vnDayStart(Date.now()) - vnDayStart(lastSubmission)) / 86400000) : null;
+    const streakStatus = lastSubmission === null ? 'none' : (daysSinceLast <= 1 ? 'active' : 'broken');
+    rows.push({ s, avg, streak, lastSubmission, streakStatus });
+  });
+
+  // Highest streak first (per teacher-dashboard requirement)
+  rows.sort((a, b) => b.streak - a.streak);
+
+  rows.forEach(({ s, avg, streak, lastSubmission, streakStatus }) => {
+    const statusLabel = { none: '—', active: 'Active', broken: 'Broken' }[streakStatus];
+    const statusColor = { none: 'var(--muted)', active: 'var(--green)', broken: 'var(--red)' }[streakStatus];
 
     const div = document.createElement('div');
     div.className = 'student-item';
@@ -4563,6 +4860,9 @@ async function loadStudents() {
       <div class="student-info">
         <h4>${s.name}</h4>
         <p>${s.email} — Lớp ${s.class} — ${s.track?.toUpperCase() || 'THPT'}</p>
+        <p style="font-size:0.78rem;color:${statusColor};margin-top:2px">
+          🔥 ${streak} ngày &nbsp;·&nbsp; ${lastSubmission ? 'Nộp gần nhất: ' + new Date(lastSubmission).toLocaleString('vi-VN') : 'Chưa nộp bài nào'} &nbsp;·&nbsp; ${statusLabel}
+        </p>
       </div>
       <div>
         ${avg !== null ? `<span class="score-badge ${avg >= 70 ? 'score-good' : avg >= 50 ? 'score-avg' : 'score-bad'}">${avg}% TB</span>` : '<span class="score-badge" style="background:var(--border);color:var(--muted)">Chưa làm bài</span>'}
@@ -4570,6 +4870,85 @@ async function loadStudents() {
     `;
     container.appendChild(div);
   });
+}
+
+// ═══════════════════════════════
+// TEACHER STREAK TRACKING TAB
+// ═══════════════════════════════
+let streakTableData = []; // cached rows for search filtering without refetching
+
+async function loadTeacherStreaks() {
+  const container = document.getElementById('teacher-streak-list');
+  container.innerHTML = '<div class="loading-spinner">Đang tải...</div>';
+
+  // Fetch ALL users and filter client-side (instead of orderByChild('role')
+  // .equalTo('student')) so a student never disappears from this list just
+  // because an old account is missing the `role` field.
+  const usersSnap = await db.ref('users').get();
+  const resultsSnap = await db.ref('results').get();
+  const overridesSnap = await db.ref('streakOverrides').get();
+  const allUsers = usersSnap.exists() ? usersSnap.val() : {};
+  const allResults = resultsSnap.exists() ? resultsSnap.val() : {};
+  const allOverrides = overridesSnap.exists() ? overridesSnap.val() : {};
+
+  const rows = [];
+  Object.entries(allUsers).forEach(([uid, s]) => {
+    const isTeacher = s.role === 'teacher' || TEACHER_EMAILS.includes(s.email);
+    if (isTeacher) return;
+    const userResultsNode = allResults[uid] || null;
+    const { streak: liveStreak, lastSubmission } = calculateStreakFromResults(userResultsNode);
+    const maxEver = calculateHistoricalMaxStreak(userResultsNode);
+    const override = allOverrides[uid] || null;
+    const shownStreak = effectiveStreak(liveStreak, override);
+    rows.push({ uid, name: s.name || s.email || uid, email: s.email || '', liveStreak, maxEver, shownStreak, lastSubmission, override });
+  });
+  rows.sort((a, b) => b.shownStreak - a.shownStreak);
+  streakTableData = rows;
+  renderStreakTable();
+}
+
+function renderStreakTable() {
+  const container = document.getElementById('teacher-streak-list');
+  if (!container) return;
+  const q = (document.getElementById('streak-search')?.value || '').trim().toLowerCase();
+  const rows = q ? streakTableData.filter(r => r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q)) : streakTableData;
+
+  if (!streakTableData.length) {
+    container.innerHTML = '<div class="empty-state"><p>Chưa có học sinh nào</p></div>';
+    return;
+  }
+  if (!rows.length) {
+    container.innerHTML = '<div class="empty-state"><p>Không tìm thấy học sinh phù hợp</p></div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'student-list';
+
+  rows.forEach(r => {
+    const canRestore = r.maxEver > r.shownStreak;
+    const nameEsc = r.name.replace(/'/g, "\\'");
+    const div = document.createElement('div');
+    div.className = 'student-item';
+    div.innerHTML =
+      '<div class="student-info">' +
+        '<h4>' + r.name + (r.override ? ' <span title="Đã chỉnh sửa thủ công" style="font-size:0.75rem;color:var(--amber)">🛟</span>' : '') + '</h4>' +
+        '<p style="font-size:1.1rem;font-weight:700;color:var(--ink)">🔥 ' + r.shownStreak + '</p>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end">' +
+        '<button onclick="promptIncreaseStreak(\'' + r.uid + '\',\'' + nameEsc + '\')" title="Tăng streak" style="padding:8px 12px;border:1px solid var(--green);background:var(--green-light);color:var(--green);border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem">➕</button>' +
+        '<button onclick="promptDecreaseStreak(\'' + r.uid + '\',\'' + nameEsc + '\')" title="Giảm streak" style="padding:8px 12px;border:1px solid var(--red);background:var(--red-light);color:var(--red);border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem">➖</button>' +
+        (canRestore
+          ? '<button onclick="restoreStudentStreak(\'' + r.uid + '\',\'' + nameEsc + '\')" style="padding:8px 16px;border:1px solid var(--blue);background:var(--blue-light);color:var(--blue);border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem">Khôi phục</button>'
+          : '') +
+        (r.override
+          ? '<button onclick="clearStreakOverride(\'' + r.uid + '\',\'' + nameEsc + '\')" style="padding:8px 12px;border:1px solid var(--border);background:none;color:var(--muted);border-radius:8px;cursor:pointer;font-size:0.8rem">Xoá chỉnh sửa</button>'
+          : '') +
+      '</div>';
+    list.appendChild(div);
+  });
+  container.appendChild(list);
 }
 
 async function loadSubmissions() {
@@ -4836,10 +5215,11 @@ async function loadTeacherResults() {
   resultsSnap.forEach(userNode => {
     const uid = userNode.key;
     const userName = users[uid]?.name || uid;
-    userNode.forEach(resultNode => {
-      const r = resultNode.val();
-      if (filterExam && resultNode.key !== filterExam) return;
-      rows.push({ uid, userName, examId: resultNode.key, ...r });
+    // Flatten so both legacy (examId -> result) and current
+    // (examId -> attemptId -> result) records render as rows.
+    flattenUserResults(userNode.val()).forEach(r => {
+      if (filterExam && r.examId !== filterExam) return;
+      rows.push({ uid, userName, ...r });
     });
   });
 
